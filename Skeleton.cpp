@@ -61,16 +61,15 @@ const char * const fragmentSource = R"(
 	}
 )";
 
-class Triangle{
-	unsigned int vao;	   // virtual world on the GPU
-	unsigned int vbo;		// vertex buffer object
-	// Geometry with 24 bytes (6 floats or 3 x 2 coordinates)
-	std::vector<float> vertices = { -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f };
-	GLenum mode=GL_TRIANGLES;
-	
-
+class Primitive{
+	protected:
+		unsigned int vao;	   // virtual world on the GPU
+		unsigned int vbo;		// vertex buffer object
+		// Geometry
+		std::vector<float> vertices;
+		GLenum mode;
 	public:
-		Triangle(const std::vector<float> v):vertices{v}{};
+		Primitive(std::vector<float> v, GLenum m):vertices{v}, mode{m}{};
 		void draw(){
 			glGenVertexArrays(1, &vao);	// get 1 vao id
 			glBindVertexArray(vao);		// make it active
@@ -89,6 +88,15 @@ class Triangle{
 			glDrawArrays(mode, 0 /*startIdx*/, 3 /*# Elements*/);
 
 			}
+};
+
+class Triangle: public Primitive{
+	// Geometry with 24 bytes (6 floats or 3 x 2 coordinates)
+	
+
+	public:
+		Triangle(const std::vector<float> v):Primitive{v, GL_TRIANGLES}{};
+		
 	
 };
 Triangle tri{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
