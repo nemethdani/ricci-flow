@@ -18,8 +18,8 @@
 //
 // NYILATKOZAT
 // ---------------------------------------------------------------------------------------------
-// Nev    : 
-// Neptun : 
+// Nev    : Nemeth Daniel
+// Neptun : FTYYJR
 // ---------------------------------------------------------------------------------------------
 // ezennel kijelentem, hogy a feladatot magam keszitettem, es ha barmilyen segitseget igenybe vettem vagy
 // mas szellemi termeket felhasznaltam, akkor a forrast es az atvett reszt kommentekben egyertelmuen jeloltem.
@@ -61,31 +61,52 @@ const char * const fragmentSource = R"(
 	}
 )";
 
+class Triangle{
+	unsigned int vao;	   // virtual world on the GPU
+	unsigned int vbo;		// vertex buffer object
+	// Geometry with 24 bytes (6 floats or 3 x 2 coordinates)
+	std::vector<float> vertices = { -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f };
+	GLenum mode=GL_TRIANGLES;
+	
+
+	public:
+		Triangle(const std::vector<float> v):vertices{v}{};
+		void draw(){
+			glGenVertexArrays(1, &vao);	// get 1 vao id
+			glBindVertexArray(vao);		// make it active
+			glGenBuffers(1, &vbo);	// Generate 1 buffer
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
+				sizeof(float)*vertices.size(),  // # bytes
+				&*(vertices.begin()),	      	// address
+				GL_STATIC_DRAW);	// we do not change later
+
+			glEnableVertexAttribArray(0);  // AttribArray 0
+			glVertexAttribPointer(0,       // vbo -> AttribArray 0
+				2, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
+				0, NULL); 		     // stride, offset: tightly packed
+			glBindVertexArray(vao);  // Draw call
+			glDrawArrays(mode, 0 /*startIdx*/, 3 /*# Elements*/);
+
+			}
+	
+};
+Triangle tri{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
+Triangle tri2{std::vector{ 0.4f, 0.5f, 0.8f, 1.5f, 1.2f, 1.6f }};
 GPUProgram gpuProgram; // vertex and fragment shaders
-unsigned int vao;	   // virtual world on the GPU
+
 
 // Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 
-	glGenVertexArrays(1, &vao);	// get 1 vao id
-	glBindVertexArray(vao);		// make it active
+	
 
-	unsigned int vbo;		// vertex buffer object
-	glGenBuffers(1, &vbo);	// Generate 1 buffer
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	// Geometry with 24 bytes (6 floats or 3 x 2 coordinates)
-	float vertices[] = { -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f };
-	glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
-		sizeof(vertices),  // # bytes
-		vertices,	      	// address
-		GL_STATIC_DRAW);	// we do not change later
+	
 
-	glEnableVertexAttribArray(0);  // AttribArray 0
-	glVertexAttribPointer(0,       // vbo -> AttribArray 0
-		2, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
-		0, NULL); 		     // stride, offset: tightly packed
-
+	
+	
+	
 	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
@@ -107,9 +128,9 @@ void onDisplay() {
 	location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
-	glBindVertexArray(vao);  // Draw call
-	glDrawArrays(GL_TRIANGLES, 0 /*startIdx*/, 3 /*# Elements*/);
-
+	
+	tri.draw();
+	tri2.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
 
