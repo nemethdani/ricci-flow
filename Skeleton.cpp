@@ -62,19 +62,21 @@ const char * const fragmentSource = R"(
 )";
 
 class Primitive{
+	virtual std::vector<float> genvertices()const =0;
 	protected:
 		unsigned int vao;	   // virtual world on the GPU
 		unsigned int vbo;		// vertex buffer object
 		// Geometry
-		std::vector<float> vertices;
+		
 		GLenum mode;
 	public:
-		Primitive(std::vector<float> v, GLenum m):vertices{v}, mode{m}{};
+		Primitive(GLenum m):mode{m}{};
 		void draw(){
 			glGenVertexArrays(1, &vao);	// get 1 vao id
 			glBindVertexArray(vao);		// make it active
 			glGenBuffers(1, &vbo);	// Generate 1 buffer
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			std::vector<float> vertices=genvertices();
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 				sizeof(float)*vertices.size(),  // # bytes
 				&*(vertices.begin()),	      	// address
@@ -91,14 +93,23 @@ class Primitive{
 };
 
 class Triangle: public Primitive{
-	// Geometry with 24 bytes (6 floats or 3 x 2 coordinates)
-	
+	std::vector<float> vertices;
+	std::vector<float> genvertices()const override final{
+		return vertices;
+	}
+	public:
+		Triangle(const std::vector<float> v):Primitive{GL_TRIANGLES}, vertices{v}{};
+};
+class Catmull_Rom_spline: public Primitive{
+	std::vector<float> controlpoints;
+	std::vector<float> genvertices()const override final{
+		
+	}
 
 	public:
-		Triangle(const std::vector<float> v):Primitive{v, GL_TRIANGLES}{};
-		
-	
+		Catmull_Rom_spline(const std::vector<float> c):Primitive{GL_LINE_LOOP}, controlpoints{c}{};
 };
+
 Triangle tri{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Triangle tri2{std::vector{ 0.4f, 0.5f, 0.8f, 1.5f, 1.2f, 1.6f }};
 GPUProgram gpuProgram; // vertex and fragment shaders
