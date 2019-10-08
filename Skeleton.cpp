@@ -62,7 +62,7 @@ const char * const fragmentSource = R"(
 )";
 
 class Primitive{
-	virtual std::vector<float> genvertices()const =0;
+	virtual void genvertices(std::vector<float>& vertices)const =0;
 	protected:
 		unsigned int vao;	   // virtual world on the GPU
 		unsigned int vbo;		// vertex buffer object
@@ -76,7 +76,8 @@ class Primitive{
 			glBindVertexArray(vao);		// make it active
 			glGenBuffers(1, &vbo);	// Generate 1 buffer
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
-			std::vector<float> vertices=genvertices();
+			std::vector<float> vertices;
+			genvertices(vertices);
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 				sizeof(float)*vertices.size(),  // # bytes
 				&*(vertices.begin()),	      	// address
@@ -94,23 +95,66 @@ class Primitive{
 
 class Triangle: public Primitive{
 	std::vector<float> vertices;
-	std::vector<float> genvertices()const override final{
-		return vertices;
+	void genvertices(std::vector<float>& temp)const override final{
+		temp=vertices;
 	}
 	public:
-		Triangle(const std::vector<float> v):Primitive{GL_TRIANGLES}, vertices{v}{};
+		Triangle(const std::vector<float>& v):Primitive{GL_TRIANGLES}, vertices{v}{};
 };
-class Catmull_Rom_spline: public Primitive{
-	std::vector<float> controlpoints;
-	std::vector<float> genvertices()const override final{
-		
+class Hermite_interpolation_curve: public Primitive{
+	std::vector<vec2> controlpoints;
+	std::vector<vec2> speeds;
+	std::vector<float> times;
+	float interpolation_increment=0.01;
+	vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
+		vec2 a0=leftpoint;
+		vec2 a1=leftspeed;
+		float t1_t0=righttime-lefttime;
+		float t1_t0_sq=t1_t0*t1_t0;
+		float t1_t0_cub=t1_t0_sq*t1_t0;
+		vec2 a2=3*(rightpoint-leftpoint)/t1_t0_sq-(rightspeed+2*leftspeed)/t1_t0;
+		vec2 a3=2*(leftpoint-rightpoint)/t1_t0_cub+(leftspeed+rightspeed)/t1_t0_sq;
+		float t_t0=t-lefttime;
+		float t_t0_sq=t_t0*t_t0;
+		float t_t0_cb=t_t0_sq*t_t0;
+		return a3*t_t0_cb+a2*t_t0_sq+a1*t_t0+a0;
+
+	}
+
+	void genvertices(std::vector<float>& temp)const override final{
+		size_t left_time_index=0;
+		size_t right_time_index=1;
+		float t=times[0];
+		while(right_time_index<times.size()){
+			vec2 vertex=Hermite_value(
+							controlpoints[left_time_index],
+							speeds[left_time_index],
+							times[left_time_index],
+							controlpoints[right_time_index],
+							speeds[right_time_index],
+							times[right_time_index],
+							t
+						);
+			temp.push_back(vertex.x);
+			temp.push_back(vertex.y);
+
+			t+=interpolation_increment;
+			if(t>=times[right_time_index]){
+				left_time_index++;
+				right_time_index++;
+			}
+		}
 	}
 
 	public:
-		Catmull_Rom_spline(const std::vector<float> c):Primitive{GL_LINE_LOOP}, controlpoints{c}{};
+		Hermite_interpolation_curve(const std::vector<vec2>& cps, std::vector<vec2>& sps ):
+			Primitive{GL_LINE_LOOP}, controlpoints{cps}, speeds{sps} {
+				for(float t=0;t<speeds.size();++t) times.push_back(t);
+			};
 };
-
-Triangle tri{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
+std::vector points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
+std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
+Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ 0.4f, 0.5f, 0.8f, 1.5f, 1.2f, 1.6f }};
 GPUProgram gpuProgram; // vertex and fragment shaders
 
@@ -149,7 +193,7 @@ void onDisplay() {
 
 	
 	tri.draw();
-	tri2.draw();
+	//tri2.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
 
