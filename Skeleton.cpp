@@ -220,7 +220,7 @@ class Hermite_interpolation_curve: public Primitive{
 
 	}
 
-	void genvertices(std::vector<float>& temp)const override final{
+	void genvertices(std::vector<float>& temp)const override{
 		size_t left_time_index=0;
 		size_t right_time_index=1;
 		float t=times[0];
@@ -252,7 +252,7 @@ class Hermite_interpolation_curve: public Primitive{
 	public:
 		Hermite_interpolation_curve(const std::vector<vec2>& cps, const std::vector<vec2>& sps=std::vector<vec2>() ):
 			Primitive{GL_TRIANGLE_FAN}, controlpoints{cps}, speeds{sps} {
-				for(float t=0;t<speeds.size();++t) times.push_back(t);
+				for(float t=0;t<controlpoints.size();++t) times.push_back(t);
 			};
 		
 };
@@ -268,7 +268,10 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 				
 				vec2 a=(controlpoints[index(i+1)]-controlpoints[index(i)]);
 				a=a/(times[index(i+1)]-times[index(i)]);
-				vec2 b=(controlpoints[index(i)]-controlpoints[index(i-1)])/(times[index(i)]-times[index(i-1)]);
+				vec2 b=controlpoints[index(i)];
+				vec2 b_=controlpoints[index(i-1)];
+				b=b-b_;
+				b=b/(times[index(i)]-times[index(i-1)]);
 				speeds.push_back(0.5*(a+b));
 
 			}
