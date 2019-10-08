@@ -35,6 +35,90 @@
 #include "framework.h"
 #include <iostream>
 
+//================
+// Okos Float osztály CPP11 labor megoldásaiból: https://cpp11.eet.bme.hu/lab03/#4
+// Nagy részét magam is mefírtam, itt az összehasonlításokhoz fogom használni
+namespace smartfloat{
+	class Float {
+	public:
+		Float() = default;
+		Float(float value) : value_(value) {}
+		explicit operator float() const { return value_; }
+	
+		static constexpr float epsilon = 1e-4f;
+	
+	private:
+		float value_;
+	};
+	
+	
+	Float operator+(Float f1, Float f2) {
+		return float(f1) + float(f2);
+	}
+	
+	Float & operator+=(Float &f1, Float f2) {
+		return f1 = f1 + f2;
+	}
+	
+	Float operator-(Float f1, Float f2) {
+		return float(f1) - float(f2);
+	}
+	
+	Float & operator-=(Float &f1, Float f2) {
+		return f1 = f1 - f2;
+	}
+	
+	/* egyoperandusú */
+	Float operator-(Float f) {
+		return -float(f);
+	}
+	
+	/* kisebb */
+	bool operator<(Float f1, Float f2) {
+		return float(f1) < float(f2)-Float::epsilon;
+	}
+	
+	/* nagyobb: "kisebb" fordítva */
+	bool operator>(Float f1, Float f2) {
+		return f2<f1;
+	}
+	
+	/* nagyobb vagy egyenlő: nem kisebb */
+	bool operator>=(Float f1, Float f2) {
+		return !(f1<f2);
+	}
+	
+	/* kisebb vagy egyenlő: nem nagyobb */
+	bool operator<=(Float f1, Float f2) {
+		return !(f1>f2);
+	}
+	
+	/* nem egyenlő: kisebb vagy nagyobb */
+	bool operator!=(Float f1, Float f2) {
+		return f1 > f2 || f1 < f2;
+	}
+	
+	/* egyenlő: nem nem egyenlő */
+	bool operator==(Float f1, Float f2) {
+		return !(f1 != f2);
+	}
+	
+	/* kíirás */
+	std::ostream & operator<< (std::ostream & os, Float f) {
+		return os << float(f);
+	}
+	
+	/* beolvasás */
+	std::istream & operator>> (std::istream & is, Float & f) {
+		float raw_f;
+		is >> raw_f;
+		f = raw_f;
+		return is;
+	}
+
+}
+// =====================
+using namespace smartfloat;
 
 // vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
 const char * const vertexSource = R"(
@@ -117,9 +201,9 @@ class Triangle: public Primitive{
 		Triangle(const std::vector<float>& v):Primitive{GL_TRIANGLES}, vertices{v}{};
 };
 class Hermite_interpolation_curve: public Primitive{
-	std::vector<vec2> controlpoints;
-	std::vector<vec2> speeds;
-	std::vector<float> times;
+	
+	
+	
 	float interpolation_increment=0.01;
 	vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
 		vec2 a0=leftpoint;
@@ -154,24 +238,49 @@ class Hermite_interpolation_curve: public Primitive{
 			temp.push_back(vertex.y);
 
 			t+=interpolation_increment;
-			if(t>=times[right_time_index]){
+			if(Float(t)>=Float(times[right_time_index])){
 				left_time_index++;
 				right_time_index++;
 			}
 		}
 	}
+	protected:
+		std::vector<vec2> speeds;
+		std::vector<vec2> controlpoints;
+		std::vector<float> times;
 
 	public:
-		Hermite_interpolation_curve(const std::vector<vec2>& cps, std::vector<vec2>& sps ):
-			Primitive{GL_POLYGON}, controlpoints{cps}, speeds{sps} {
+		Hermite_interpolation_curve(const std::vector<vec2>& cps, const std::vector<vec2>& sps=std::vector<vec2>() ):
+			Primitive{GL_TRIANGLE_FAN}, controlpoints{cps}, speeds{sps} {
 				for(float t=0;t<speeds.size();++t) times.push_back(t);
 			};
+		
 };
+
+class Catmull_Rom_spline: public Hermite_interpolation_curve{
+	size_t numCtrPts=controlpoints.size();
+	size_t index(size_t i)const{return i%numCtrPts;};
+	public:
+		Catmull_Rom_spline(std::vector<vec2>& v):Hermite_interpolation_curve(v){
+			
+			
+			for(size_t i=0;i<numCtrPts;i<++i){
+				
+				vec2 a=(controlpoints[index(i+1)]-controlpoints[index(i)]);
+				a=a/(times[index(i+1)]-times[index(i)]);
+				vec2 b=(controlpoints[index(i)]-controlpoints[index(i-1)])/(times[index(i)]-times[index(i-1)]);
+				speeds.push_back(0.5*(a+b));
+
+			}
+		}
+};
+
 std::vector points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
 std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
-Polygon poly{points};
+//Polygon poly{points};
 //Hermite_interpolation_curve tri{points, speeds};
 //Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
+Catmull_Rom_spline crs{points};
 GPUProgram gpuProgram; // vertex and fragment shaders
 
 
@@ -201,8 +310,7 @@ void onDisplay() {
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 	
-	poly.draw();
-	//tri2.draw();
+	crs.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
 
