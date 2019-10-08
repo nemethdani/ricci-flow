@@ -33,6 +33,7 @@
 //=============================================================================================
 
 #include "framework.h"
+#include <iostream>
 
 
 // vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
@@ -66,7 +67,7 @@ class Primitive{
 	protected:
 		unsigned int vao;	   // virtual world on the GPU
 		unsigned int vbo;		// vertex buffer object
-		// Geometry
+		unsigned int dimension=2;
 		
 		GLenum mode;
 	public:
@@ -87,10 +88,24 @@ class Primitive{
 			glVertexAttribPointer(0,       // vbo -> AttribArray 0
 				2, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
 				0, NULL); 		     // stride, offset: tightly packed
+			
 			glBindVertexArray(vao);  // Draw call
-			glDrawArrays(mode, 0 /*startIdx*/, 3 /*# Elements*/);
+			glDrawArrays(mode, 0 /*startIdx*/, vertices.size()/dimension /*# Elements*/);
+			std::cout<<glGetError()<<std::endl;
 
 			}
+};
+
+class Polygon: public Primitive{
+	std::vector<vec2> vertices;
+	void genvertices(std::vector<float>& temp)const override{
+		for(auto v: vertices){
+			temp.push_back(v.x);
+			temp.push_back(v.y);
+		}
+	}
+	public:
+		Polygon(const std::vector<vec2>& v):Primitive{GL_TRIANGLE_FAN}, vertices{v}{}
 };
 
 class Triangle: public Primitive{
@@ -148,14 +163,15 @@ class Hermite_interpolation_curve: public Primitive{
 
 	public:
 		Hermite_interpolation_curve(const std::vector<vec2>& cps, std::vector<vec2>& sps ):
-			Primitive{GL_LINE_LOOP}, controlpoints{cps}, speeds{sps} {
+			Primitive{GL_POLYGON}, controlpoints{cps}, speeds{sps} {
 				for(float t=0;t<speeds.size();++t) times.push_back(t);
 			};
 };
 std::vector points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
 std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
-Hermite_interpolation_curve tri{points, speeds};
-Triangle tri2{std::vector{ 0.4f, 0.5f, 0.8f, 1.5f, 1.2f, 1.6f }};
+Polygon poly{points};
+//Hermite_interpolation_curve tri{points, speeds};
+//Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 GPUProgram gpuProgram; // vertex and fragment shaders
 
 
@@ -163,13 +179,6 @@ GPUProgram gpuProgram; // vertex and fragment shaders
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 
-	
-
-	
-
-	
-	
-	
 	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
@@ -192,7 +201,7 @@ void onDisplay() {
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 	
-	tri.draw();
+	poly.draw();
 	//tri2.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
