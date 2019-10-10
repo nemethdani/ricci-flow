@@ -201,52 +201,65 @@ class Triangle: public Primitive{
 		Triangle(const std::vector<float>& v):Primitive{GL_TRIANGLES}, vertices{v}{};
 };
 class Hermite_interpolation_curve: public Primitive{
-	size_t ngon;
-
-	vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
-		vec2 a0=leftpoint;
-		vec2 a1=leftspeed;
-		float t1_t0=righttime-lefttime;
-		float t1_t0_sq=t1_t0*t1_t0;
-		float t1_t0_cub=t1_t0_sq*t1_t0;
-		vec2 a2=3*(rightpoint-leftpoint)/t1_t0_sq-(rightspeed+2*leftspeed)/t1_t0;
-		vec2 a3=2*(leftpoint-rightpoint)/t1_t0_cub+(leftspeed+rightspeed)/t1_t0_sq;
-		float t_t0=t-lefttime;
-		float t_t0_sq=t_t0*t_t0;
-		float t_t0_cb=t_t0_sq*t_t0;
-		return a3*t_t0_cb+a2*t_t0_sq+a1*t_t0+a0;
-
-	}
-
-	void genvertices(std::vector<float>& temp)const override{
-		size_t left_time_index=0;
-		size_t right_time_index=1;
-		float t=times[0];
-		float t_step_size=1.0/(float(ngon)/float(times.size()));
-		while(right_time_index<times.size()){
-			vec2 vertex=Hermite_value(
-							controlpoints[left_time_index],
-							speeds[left_time_index],
-							times[left_time_index],
-							controlpoints[right_time_index],
-							speeds[right_time_index],
-							times[right_time_index],
-							t
-						);
-			temp.push_back(vertex.x);
-			temp.push_back(vertex.y);
-
-			t+=t_step_size;
-			if(Float(t)>=Float(times[right_time_index])){
-				left_time_index++;
-				right_time_index++;
-			}
-		}
-	}
 	protected:
 		std::vector<vec2> speeds;
 		std::vector<vec2> controlpoints;
 		std::vector<float> times;
+		size_t index(int i)const{
+			size_t numCtrPts=controlpoints.size();
+			if(i>=0){
+				return i%numCtrPts;
+			}
+			else{
+				int negmod=(-i)%numCtrPts;
+				int ret=numCtrPts-negmod;
+				return ret%numCtrPts;
+			}
+		}
+	private:
+		size_t ngon;
+
+		vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
+			vec2 a0=leftpoint;
+			vec2 a1=leftspeed;
+			float t1_t0=righttime-lefttime;
+			float t1_t0_sq=t1_t0*t1_t0;
+			float t1_t0_cub=t1_t0_sq*t1_t0;
+			vec2 a2=3*(rightpoint-leftpoint)/t1_t0_sq-(rightspeed+2*leftspeed)/t1_t0;
+			vec2 a3=2*(leftpoint-rightpoint)/t1_t0_cub+(leftspeed+rightspeed)/t1_t0_sq;
+			float t_t0=t-lefttime;
+			float t_t0_sq=t_t0*t_t0;
+			float t_t0_cb=t_t0_sq*t_t0;
+			return a3*t_t0_cb+a2*t_t0_sq+a1*t_t0+a0;
+
+		}
+
+		void genvertices(std::vector<float>& temp)const override{
+			size_t left_time_index=0;
+			size_t right_time_index=1;
+			float t=times[0];
+			float t_step_size=1.0/(float(ngon)/float(times.size()));
+			while(right_time_index<=times.size()){
+				vec2 vertex=Hermite_value(
+								controlpoints[index(left_time_index)],
+								speeds[index(left_time_index)],
+								times[index(left_time_index)],
+								controlpoints[index(right_time_index)],
+								speeds[index(right_time_index)],
+								times[index(right_time_index)],
+								t
+							);
+				temp.push_back(vertex.x);
+				temp.push_back(vertex.y);
+
+				t+=t_step_size;
+				if(Float(t)>=Float(right_time_index)){
+					left_time_index++;
+					right_time_index++;
+				};
+			};
+		};
+	
 
 	public:
 		Hermite_interpolation_curve(size_t ngon, const std::vector<vec2>& cps, const std::vector<vec2>& sps=std::vector<vec2>() ):
@@ -258,16 +271,7 @@ class Hermite_interpolation_curve: public Primitive{
 
 class Catmull_Rom_spline: public Hermite_interpolation_curve{
 	size_t numCtrPts=controlpoints.size();
-	size_t index(int i)const{
-		if(i>=0){
-			return i%numCtrPts;
-		}
-		else{
-			int negmod=(-i)%numCtrPts;
-			int ret=numCtrPts-negmod;
-			return ret%numCtrPts;
-		}
-}
+	
 	public:
 		Catmull_Rom_spline(size_t ngon,std::vector<vec2>& v):Hermite_interpolation_curve(ngon, v){
 			
@@ -275,11 +279,12 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 			for(size_t i=0;i<numCtrPts;i<++i){
 				
 				vec2 a=(controlpoints[index(i+1)]-controlpoints[index(i)]);
-				a=a/(times[index(i+1)]-times[index(i)]);
+				a=a/fabs(times[index(i+1)]-times[index(i)]);
 				vec2 b=controlpoints[index(i)];
 				vec2 b_=controlpoints[index(i-1)];
 				b=b-b_;
-				b=b/(times[index(i)]-times[index(i-1)]);
+				b=b/fabs(times[index(i)]-times[index(i-1)]);
+				
 				speeds.push_back(0.5*(a+b));
 
 			}
@@ -290,7 +295,7 @@ std::vector points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
 std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
 //Polygon poly{points};
 //Hermite_interpolation_curve tri{points, speeds};
-//Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
+Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,points};
 GPUProgram gpuProgram; // vertex and fragment shaders
 
@@ -320,7 +325,7 @@ void onDisplay() {
 	location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
-	
+	//tri2.draw();
 	crs.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
