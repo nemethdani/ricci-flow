@@ -201,10 +201,8 @@ class Triangle: public Primitive{
 		Triangle(const std::vector<float>& v):Primitive{GL_TRIANGLES}, vertices{v}{};
 };
 class Hermite_interpolation_curve: public Primitive{
-	
-	
-	
-	float interpolation_increment=0.01;
+	size_t ngon;
+
 	vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
 		vec2 a0=leftpoint;
 		vec2 a1=leftspeed;
@@ -237,7 +235,7 @@ class Hermite_interpolation_curve: public Primitive{
 			temp.push_back(vertex.x);
 			temp.push_back(vertex.y);
 
-			t+=interpolation_increment;
+			t+=(float(times.size())/float(ngon));
 			if(Float(t)>=Float(times[right_time_index])){
 				left_time_index++;
 				right_time_index++;
@@ -250,8 +248,8 @@ class Hermite_interpolation_curve: public Primitive{
 		std::vector<float> times;
 
 	public:
-		Hermite_interpolation_curve(const std::vector<vec2>& cps, const std::vector<vec2>& sps=std::vector<vec2>() ):
-			Primitive{GL_TRIANGLE_FAN}, controlpoints{cps}, speeds{sps} {
+		Hermite_interpolation_curve(size_t ngon, const std::vector<vec2>& cps, const std::vector<vec2>& sps=std::vector<vec2>() ):
+			ngon(ngon), Primitive{GL_TRIANGLE_FAN}, controlpoints{cps}, speeds{sps} {
 				for(float t=0;t<controlpoints.size();++t) times.push_back(t);
 			};
 		
@@ -259,9 +257,18 @@ class Hermite_interpolation_curve: public Primitive{
 
 class Catmull_Rom_spline: public Hermite_interpolation_curve{
 	size_t numCtrPts=controlpoints.size();
-	size_t index(size_t i)const{return i%numCtrPts;};
+	size_t index(int i)const{
+		if(i>=0){
+			return i%numCtrPts;
+		}
+		else{
+			int negmod=(-i)%numCtrPts;
+			int ret=numCtrPts-negmod;
+			return ret%numCtrPts;
+		}
+}
 	public:
-		Catmull_Rom_spline(std::vector<vec2>& v):Hermite_interpolation_curve(v){
+		Catmull_Rom_spline(size_t ngon,std::vector<vec2>& v):Hermite_interpolation_curve(ngon, v){
 			
 			
 			for(size_t i=0;i<numCtrPts;i<++i){
@@ -283,7 +290,7 @@ std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
 //Polygon poly{points};
 //Hermite_interpolation_curve tri{points, speeds};
 //Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
-Catmull_Rom_spline crs{points};
+Catmull_Rom_spline crs{10,points};
 GPUProgram gpuProgram; // vertex and fragment shaders
 
 
