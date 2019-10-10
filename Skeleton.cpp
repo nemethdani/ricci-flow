@@ -222,6 +222,7 @@ class Hermite_interpolation_curve: public Primitive{
 		size_t left_time_index=0;
 		size_t right_time_index=1;
 		float t=times[0];
+		float t_step_size=1.0/(float(ngon)/float(times.size()));
 		while(right_time_index<times.size()){
 			vec2 vertex=Hermite_value(
 							controlpoints[left_time_index],
@@ -235,7 +236,7 @@ class Hermite_interpolation_curve: public Primitive{
 			temp.push_back(vertex.x);
 			temp.push_back(vertex.y);
 
-			t+=(float(times.size())/float(ngon));
+			t+=t_step_size;
 			if(Float(t)>=Float(times[right_time_index])){
 				left_time_index++;
 				right_time_index++;
@@ -290,7 +291,7 @@ std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
 //Polygon poly{points};
 //Hermite_interpolation_curve tri{points, speeds};
 //Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
-Catmull_Rom_spline crs{10,points};
+Catmull_Rom_spline crs{100,points};
 GPUProgram gpuProgram; // vertex and fragment shaders
 
 
