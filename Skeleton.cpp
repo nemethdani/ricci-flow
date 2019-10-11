@@ -218,6 +218,7 @@ class Hermite_interpolation_curve: public Primitive{
 		}
 	private:
 		size_t ngon;
+		std::vector<vec2> accelerations;
 
 		vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
 			vec2 a0=leftpoint;
@@ -234,11 +235,12 @@ class Hermite_interpolation_curve: public Primitive{
 
 		}
 
-		void genvertices(std::vector<float>& temp)const override{
+		void genvertices_helper(std::vector<float>& temp)const{
 			size_t left_time_index=0;
 			size_t right_time_index=1;
 			float t=times[0];
 			float t_step_size=1.0/(float(ngon)/float(times.size()));
+			std::vector<vec2> vertices;
 			while(right_time_index<=times.size()){
 				vec2 vertex=Hermite_value(
 								controlpoints[index(left_time_index)],
@@ -249,8 +251,7 @@ class Hermite_interpolation_curve: public Primitive{
 								times[index(right_time_index)],
 								t
 							);
-				temp.push_back(vertex.x);
-				temp.push_back(vertex.y);
+				vertices.push_back(vertex);
 
 				t+=t_step_size;
 				if(Float(t)>=Float(right_time_index)){
@@ -258,6 +259,16 @@ class Hermite_interpolation_curve: public Primitive{
 					right_time_index++;
 				};
 			};
+			std::vector<float> vertices_float;
+			for(auto v:vertices){
+				vertices_float.push_back(v.x);
+				vertices_float.push_back(v.y);
+			}
+			temp=vertices_float;
+		};
+
+		void genvertices(std::vector<float>& temp)const override{
+			genvertices_helper(temp);
 		};
 	
 
