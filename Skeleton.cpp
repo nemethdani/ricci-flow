@@ -181,15 +181,17 @@ class Primitive{
 };
 
 class Polygon: public Primitive{
-	std::vector<vec2> vertices;
 	void genvertices(std::vector<float>& temp)const override{
 		for(auto v: vertices){
 			temp.push_back(v.x);
 			temp.push_back(v.y);
 		}
 	}
+	protected:
+		std::vector<vec2> vertices;
+
 	public:
-		Polygon(const std::vector<vec2>& v):Primitive{GL_TRIANGLE_FAN}, vertices{v}{}
+		Polygon(const std::vector<vec2>& v=std::vector<vec2>()):Primitive{GL_TRIANGLE_FAN}, vertices{v}{}
 };
 
 class Triangle: public Primitive{
@@ -200,8 +202,9 @@ class Triangle: public Primitive{
 	public:
 		Triangle(const std::vector<float>& v):Primitive{GL_TRIANGLES}, vertices{v}{};
 };
-class Hermite_interpolation_curve: public Primitive{
+class Hermite_interpolation_curve: public Polygon{
 	protected:
+		size_t ngon;
 		std::vector<vec2> speeds;
 		std::vector<vec2> controlpoints;
 		std::vector<float> times;
@@ -216,8 +219,35 @@ class Hermite_interpolation_curve: public Primitive{
 				return ret%numCtrPts;
 			}
 		}
+		void genvertices_helper(std::vector<vec2>& temp)const{
+			if(controlpoints.size()==0 || speeds.size()==0 || controlpoints.size()!=speeds.size()) return;
+			size_t left_time_index=0;
+			size_t right_time_index=1;
+			float t=times[0];
+			float t_step_size=1.0/(float(ngon)/float(times.size()));
+			
+			while(right_time_index<=times.size()){
+				vec2 vertex=Hermite_value(
+								controlpoints[index(left_time_index)],
+								speeds[index(left_time_index)],
+								times[index(left_time_index)],
+								controlpoints[index(right_time_index)],
+								speeds[index(right_time_index)],
+								times[index(right_time_index)],
+								t
+							);
+				temp.push_back(vertex);
+
+				t+=t_step_size;
+				if(Float(t)>=Float(right_time_index)){
+					left_time_index++;
+					right_time_index++;
+				};
+			};
+			
+		};
 	private:
-		size_t ngon;
+		
 		std::vector<vec2> accelerations;
 
 		vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
@@ -235,47 +265,19 @@ class Hermite_interpolation_curve: public Primitive{
 
 		}
 
-		void genvertices_helper(std::vector<float>& temp)const{
-			size_t left_time_index=0;
-			size_t right_time_index=1;
-			float t=times[0];
-			float t_step_size=1.0/(float(ngon)/float(times.size()));
-			std::vector<vec2> vertices;
-			while(right_time_index<=times.size()){
-				vec2 vertex=Hermite_value(
-								controlpoints[index(left_time_index)],
-								speeds[index(left_time_index)],
-								times[index(left_time_index)],
-								controlpoints[index(right_time_index)],
-								speeds[index(right_time_index)],
-								times[index(right_time_index)],
-								t
-							);
-				vertices.push_back(vertex);
+		
 
-				t+=t_step_size;
-				if(Float(t)>=Float(right_time_index)){
-					left_time_index++;
-					right_time_index++;
-				};
-			};
-			std::vector<float> vertices_float;
-			for(auto v:vertices){
-				vertices_float.push_back(v.x);
-				vertices_float.push_back(v.y);
-			}
-			temp=vertices_float;
-		};
-
-		void genvertices(std::vector<float>& temp)const override{
-			genvertices_helper(temp);
-		};
+		// void genvertices(std::vector<float>& temp)const override{
+		// 	genvertices_helper(temp);
+		// };
 	
 
 	public:
 		Hermite_interpolation_curve(size_t ngon, const std::vector<vec2>& cps, const std::vector<vec2>& sps=std::vector<vec2>() ):
-			ngon(ngon), Primitive{GL_TRIANGLE_FAN}, controlpoints{cps}, speeds{sps} {
+			ngon(ngon), controlpoints{cps}, speeds{sps} {
 				for(float t=0;t<controlpoints.size();++t) times.push_back(t);
+				genvertices_helper(vertices);
+
 			};
 		
 };
@@ -284,7 +286,7 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 	size_t numCtrPts=controlpoints.size();
 	
 	public:
-		Catmull_Rom_spline(size_t ngon,std::vector<vec2>& v):Hermite_interpolation_curve(ngon, v){
+		Catmull_Rom_spline(size_t ngon_,std::vector<vec2>& ctrpts_):Hermite_interpolation_curve(ngon_,ctrpts_){
 			
 			
 			for(size_t i=0;i<numCtrPts;i<++i){
@@ -299,6 +301,7 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 				speeds.push_back(0.5*(a+b));
 
 			}
+			genvertices_helper(vertices);
 		}
 };
 
