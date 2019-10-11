@@ -291,6 +291,8 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 		}
 };
 
+
+// http://mathworld.wolfram.com/LagrangeInterpolatingPolynomial.html (5)ös képletből
 vec2 Lagrange_acceleration(float t1, float t2, float t3, vec2 r1, vec2 r2, vec2 r3){
 	vec2 a=r1/(t1-t2)/(t1-t3);
 	vec2 b=r2/(t2-t1)/(t2-t3);
