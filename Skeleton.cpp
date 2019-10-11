@@ -291,6 +291,14 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 		}
 };
 
+vec2 Lagrange_acceleration(float t1, float t2, float t3, vec2 r1, vec2 r2, vec2 r3){
+	vec2 a=r1/(t1-t2)/(t1-t3);
+	vec2 b=r2/(t2-t1)/(t2-t3);
+	vec2 c=r3/(t3-t1)/(t3-t2);
+	return 2.0*(a+b+c);
+
+}
+
 std::vector points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
 std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
 //Polygon poly{points};
