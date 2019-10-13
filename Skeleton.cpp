@@ -74,6 +74,13 @@ namespace smartfloat{
 	Float & operator/=(Float &f1, Float f2) {
 		return f1 = f1 / f2;
 	}
+	Float operator*(Float f1, Float f2) {
+		return float(f1) * float(f2);
+	}
+	
+	Float & operator*=(Float &f1, Float f2) {
+		return f1 = f1 * f2;
+	}
 	
 	/* egyoperandusú */
 	Float operator-(Float f) {
@@ -127,6 +134,11 @@ namespace smartfloat{
 // =====================
 using namespace smartfloat;
 
+bool operator==(const vec2& v1, const vec2& v2){
+	return Float(v1.x)==Float(v2.x) && (Float(v1.y)==Float(v2.y));
+}
+using namespace smartfloat;
+
 // vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
 const char * const vertexSource = R"(
 	#version 330				// Shader 3.3
@@ -152,6 +164,28 @@ const char * const fragmentSource = R"(
 		outColor = vec4(color, 1);	// computed color is the color of the primitive
 	}
 )";
+
+bool segmentIntersect(vec2 segment1_point1, vec2 segment1_point2, vec2 segment2_point1,vec2 segment2_point2){
+	if(segment1_point1==segment2_point1
+		|| segment1_point1==segment2_point2
+		|| segment1_point2==segment2_point1
+		|| segment1_point2==segment2_point2)
+
+		return true;
+	Float A=segment1_point1.x - segment1_point2.x;
+	Float B=segment2_point2.x- segment2_point1.x;
+	Float C=segment1_point1.y-segment1_point2.y;
+	Float D= segment2_point2.y-segment1_point2.y;
+	Float E=segment1_point2.x - segment2_point2.x;
+	Float F= segment1_point2.y- segment2_point2.y;
+	Float t2=(F-C*E/A)/(D-C*B/A);
+	if(t2>1 || t2<0) return false;
+	Float t1=E/A-B/A*((F-C*E/A)/(D-C*B/A));
+	return (t1>0 && t1<1);
+	
+}
+
+
 
 class Primitive{
 	virtual void genvertices(std::vector<float>& vertices)const =0;
@@ -189,13 +223,68 @@ class Primitive{
 
 class Polygon: public Primitive{
 	private:
+		virtual size_t index(int i)const{
+			int numcontrolpoints=vertices.size();
+			if(i>=0){
+				return i%numcontrolpoints;
+			}
+			else{
+				int negmod=(-i)%numcontrolpoints;
+				int ret=numcontrolpoints-negmod;
+				return ret%numcontrolpoints;
+			}
+		}
+		bool isDiagonal(const vec2& point1, const vec2& point2)const{
+			if(segmentIntersect(point1, point2, vertices.back(), vertices.front())) return false;
+			if(!doesContain((point1+point2)/2)) return false;
+			return true;
+		}
 		void genvertices(std::vector<float>& temp)const override{
-			for(auto v: vertices){
+			std::vector<vec2> triangles;
+			triangles=earclipping(triangles);
+			for(auto v: triangles){
 				temp.push_back(v.x);
 				temp.push_back(v.y);
 			}
 		}
-		bool rayCastIntersect(vec2 point, vec2 segmentVertex1, vec2 segmentVertex2){
+
+		
+
+		std::vector<vec2>& earclipping(std::vector<vec2>& triangles)const{
+			size_t numberofclips=0;
+			std::vector<bool> isClipped(vertices.size(),false);
+			
+			size_t i=0;
+			while(numberofclips<vertices.size()-3){
+				if(isClipped[i]==false){
+					size_t left=index(i-1);
+					while(isClipped[left]==true){left=index(left-1);}
+					size_t right=index(i+1);
+					while(isClipped[right]==true){right=index(left+1);}
+					if(isDiagonal(vertices[left], vertices[right])){
+						triangles.push_back(vertices[left]);
+						triangles.push_back(vertices[i]);
+						triangles.push_back(vertices[right]);
+						isClipped[i]=true;
+						++numberofclips;
+					}
+				}
+				i=index(i+1);
+			}
+			while(numberofclips>0){
+				if(isClipped[i]==false){
+					triangles.push_back(vertices[i]);
+					++numberofclips;
+					isClipped[i]==true;
+					
+				}
+				i=index(i+1);
+			}
+			return triangles;
+			
+		}
+
+		bool rayCastIntersect(vec2 point, vec2 segmentVertex1, vec2 segmentVertex2)const{
 				if(point.y == segmentVertex2.y) return false;
 				vec2 A=segmentVertex1;
 				vec2 B=segmentVertex2;
@@ -219,8 +308,8 @@ class Polygon: public Primitive{
 	protected:
 		std::vector<vec2> vertices;
 	public:
-		Polygon(const std::vector<vec2>& v=std::vector<vec2>()):Primitive{GL_TRIANGLE_FAN}, vertices{v}{};
-		bool doesContain(vec2& point){
+		Polygon(const std::vector<vec2>& v=std::vector<vec2>()):Primitive{GL_TRIANGLES}, vertices{v}{};
+		bool doesContain(const vec2& point)const{
 			bool contain=false;
 			bool intersect;
 			if(rayCastIntersect(point, vertices.back(),vertices.front())) contain=(!contain);
