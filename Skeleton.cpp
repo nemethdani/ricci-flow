@@ -67,6 +67,13 @@ namespace smartfloat{
 	Float & operator-=(Float &f1, Float f2) {
 		return f1 = f1 - f2;
 	}
+	Float operator/(Float f1, Float f2) {
+		return float(f1) / float(f2);
+	}
+	
+	Float & operator/=(Float &f1, Float f2) {
+		return f1 = f1 / f2;
+	}
 	
 	/* egyoperandusú */
 	Float operator-(Float f) {
@@ -175,23 +182,58 @@ class Primitive{
 			
 			glBindVertexArray(vao);  // Draw call
 			glDrawArrays(mode, 0 /*startIdx*/, vertices.size()/dimension /*# Elements*/);
-			std::cout<<glGetError()<<std::endl;
+			//std::cout<<glGetError()<<std::endl;
 
 			}
 };
 
 class Polygon: public Primitive{
-	void genvertices(std::vector<float>& temp)const override{
-		for(auto v: vertices){
-			temp.push_back(v.x);
-			temp.push_back(v.y);
+	private:
+		void genvertices(std::vector<float>& temp)const override{
+			for(auto v: vertices){
+				temp.push_back(v.x);
+				temp.push_back(v.y);
+			}
 		}
-	}
+		bool rayCastIntersect(vec2 point, vec2 segmentVertex1, vec2 segmentVertex2){
+				if(point.y == segmentVertex2.y) return false;
+				vec2 A=segmentVertex1;
+				vec2 B=segmentVertex2;
+				if(Float(A.y) > Float(B.y)) std::swap(A,B);
+				if(Float(point.y)>Float(B.y) || Float(point.y)<Float(A.y)) return false;
+				if(Float(point.x)> std::max(Float(A.x), Float(B.x))) return false;
+				if(Float(point.x)< std::min(Float(A.x), Float(B.x))) return true;
+				Float dx=Float(B.x)-Float(A.x);
+				Float dy=Float(B.y)-Float(A.y);
+				Float slopeAB=dy/dx;
+				bool res;
+				if(dy/dx >0) {
+					res=((Float(point.y)-Float(A.y))/(Float(point.x)-Float(A.x)) > slopeAB);
+					return res;
+				}
+				else {
+					res= ((Float(A.y)-Float(point.y))/(Float(A.x)-Float(point.x)) > slopeAB);
+					return res;
+				};
+		};
 	protected:
 		std::vector<vec2> vertices;
-
 	public:
-		Polygon(const std::vector<vec2>& v=std::vector<vec2>()):Primitive{GL_TRIANGLE_FAN}, vertices{v}{}
+		Polygon(const std::vector<vec2>& v=std::vector<vec2>()):Primitive{GL_TRIANGLE_FAN}, vertices{v}{};
+		bool doesContain(vec2& point){
+			bool contain=false;
+			bool intersect;
+			if(rayCastIntersect(point, vertices.back(),vertices.front())) contain=(!contain);
+			for(size_t i=0;i<vertices.size()-1;++i){
+				intersect=rayCastIntersect(point, vertices[i],vertices[i+1]);
+				if(intersect){
+					contain=(!contain);
+				}
+					
+			}
+			return contain;
+
+		}
 };
 
 class Triangle: public Primitive{
@@ -208,17 +250,19 @@ class Hermite_interpolation_curve: public Polygon{
 		std::vector<vec2> speeds;
 		std::vector<vec2> controlpoints;
 		std::vector<float> times;
+
 		size_t index(int i)const{
-			size_t numCtrPts=controlpoints.size();
+			int numcontrolpoints=controlpoints.size();
 			if(i>=0){
-				return i%numCtrPts;
+				return i%numcontrolpoints;
 			}
 			else{
-				int negmod=(-i)%numCtrPts;
-				int ret=numCtrPts-negmod;
-				return ret%numCtrPts;
+				int negmod=(-i)%numcontrolpoints;
+				int ret=numcontrolpoints-negmod;
+				return ret%numcontrolpoints;
 			}
 		}
+		
 		void genvertices_helper(std::vector<vec2>& temp)const{
 			if(controlpoints.size()==0 || speeds.size()==0 || controlpoints.size()!=speeds.size()) return;
 			size_t left_time_index=0;
@@ -248,7 +292,7 @@ class Hermite_interpolation_curve: public Polygon{
 		};
 	private:
 		
-		std::vector<vec2> accelerations;
+		
 
 		vec2 Hermite_value(vec2 leftpoint, vec2 leftspeed, float lefttime, vec2 rightpoint, vec2 rightspeed, float righttime, float t)const{
 			vec2 a0=leftpoint;
@@ -315,8 +359,13 @@ vec2 Lagrange_acceleration(float t1, float t2, float t3, vec2 r1, vec2 r2, vec2 
 
 }
 
-std::vector points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
-std::vector speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
+std::vector<vec2> points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
+std::vector<vec2> speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
+std::vector<vec2> polypoints{vec2(20, 10),
+                 vec2(50, 125),
+                 vec2(125, 90),
+                 vec2(150, 10)};
+Polygon poly(polypoints);
 //Polygon poly{points};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
@@ -352,6 +401,25 @@ void onDisplay() {
 	//tri2.draw();
 	crs.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
+	
+	
+    vec2 p1(75, 50);
+    std::cout<< poly.doesContain(p1)<< "expected: 1"<<std::endl; //1
+
+    
+    vec2 p2(200, 50);
+    std::cout<< poly.doesContain(p2)<< "expected: 0"<<std::endl; //0
+
+   
+    vec2 p3(35, 90);
+    std::cout<< poly.doesContain(p3)<< "expected: 0"<<std::endl; //0
+
+    // ez az eset nem kell, mert a szakaszmetszés vizsgálatnál kijönne
+    // vec2 p4(50, 10);
+    // std::cout<< poly.doesContain(p4)<< "expected: 1"<<std::endl; //1
+
+	vec2 p4(75, 90);
+    std::cout<< poly.doesContain(p4)<< "expected: 1"<<std::endl; //1
 }
 
 // Key of ASCII code pressed
