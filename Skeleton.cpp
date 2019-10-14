@@ -246,12 +246,15 @@ class Polygon: public Primitive{
 
 		}
 		void genvertices(std::vector<float>& temp)const override{
-			std::vector<vec2> triangles;
-			triangles=earclipping(triangles);
-			for(auto v: triangles){
-				temp.push_back(v.x);
-				temp.push_back(v.y);
+			if(vertices.size()>=3){
+				std::vector<vec2> triangles;
+				triangles=earclipping(triangles);
+				for(auto v: triangles){
+					temp.push_back(v.x);
+					temp.push_back(v.y);
+				}
 			}
+			
 		}
 
 		
@@ -328,6 +331,9 @@ class Polygon: public Primitive{
 			}
 			return contain;
 
+		}
+		virtual void add(const vec2& point){
+			vertices.push_back(point);
 		}
 };
 
@@ -460,8 +466,8 @@ std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(50, 125),
                  vec2(125, 90),
                  vec2(150, 10)};
-Polygon poly(points);
-//Polygon poly{points};
+//Polygon poly(points);
+Polygon poly{};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,points};
@@ -495,27 +501,13 @@ void onDisplay() {
 
 	//tri2.draw();
 	//crs.draw();
-	poly.draw();
+	//poly.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
+
 	
 	
-    vec2 p1(75, 50);
-    std::cout<< poly.doesContain(p1)<< "expected: 1"<<std::endl; //1
+	
 
-    
-    vec2 p2(200, 50);
-    std::cout<< poly.doesContain(p2)<< "expected: 0"<<std::endl; //0
-
-   
-    vec2 p3(35, 90);
-    std::cout<< poly.doesContain(p3)<< "expected: 0"<<std::endl; //0
-
-    // ez az eset nem kell, mert a szakaszmetszés vizsgálatnál kijönne
-    // vec2 p4(50, 10);
-    // std::cout<< poly.doesContain(p4)<< "expected: 1"<<std::endl; //1
-
-	vec2 p4(75, 90);
-    std::cout<< poly.doesContain(p4)<< "expected: 1"<<std::endl; //1
 }
 
 // Key of ASCII code pressed
@@ -548,7 +540,20 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	}
 
 	switch (button) {
-	case GLUT_LEFT_BUTTON:   printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);   break;
+	case GLUT_LEFT_BUTTON:{
+		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
+		if(buttonStat=="pressed"){
+			poly.add(vec2(cX, cY));
+			std::cout<<"vertex added to: "<<cX<<","<<cY<<std::endl;
+			glClear(GL_COLOR_BUFFER_BIT);
+			poly.draw();
+		}
+		
+		glutSwapBuffers();
+
+		break;
+
+	} 
 	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
 	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
 	}
