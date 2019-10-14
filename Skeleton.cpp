@@ -171,7 +171,7 @@ bool segmentIntersect(vec2 segment1_point1, vec2 segment1_point2, vec2 segment2_
 		|| segment1_point2==segment2_point1
 		|| segment1_point2==segment2_point2)
 
-		return true;
+		return false;
 	Float A=segment1_point1.x - segment1_point2.x;
 	Float B=segment2_point2.x- segment2_point1.x;
 	Float C=segment1_point1.y-segment1_point2.y;
@@ -236,8 +236,14 @@ class Polygon: public Primitive{
 		}
 		bool isDiagonal(const vec2& point1, const vec2& point2)const{
 			if(segmentIntersect(point1, point2, vertices.back(), vertices.front())) return false;
+			
+			for(size_t i=0;i<vertices.size()-1;++i){
+				if(segmentIntersect(point1, point2, vertices[i], vertices[i+1])) return false;
+				
+			}
 			if(!doesContain((point1+point2)/2)) return false;
 			return true;
+
 		}
 		void genvertices(std::vector<float>& temp)const override{
 			std::vector<vec2> triangles;
@@ -271,7 +277,7 @@ class Polygon: public Primitive{
 				}
 				i=index(i+1);
 			}
-			while(numberofclips>0){
+			while(numberofclips-vertices.size()>0){
 				if(isClipped[i]==false){
 					triangles.push_back(vertices[i]);
 					++numberofclips;
@@ -448,13 +454,13 @@ vec2 Lagrange_acceleration(float t1, float t2, float t3, vec2 r1, vec2 r2, vec2 
 
 }
 
-std::vector<vec2> points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f)};
+std::vector<vec2> points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f), vec2(0.0f, 0.1f)};
 std::vector<vec2> speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
 std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(50, 125),
                  vec2(125, 90),
                  vec2(150, 10)};
-Polygon poly(polypoints);
+Polygon poly(points);
 //Polygon poly{points};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
@@ -488,7 +494,8 @@ void onDisplay() {
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 	//tri2.draw();
-	crs.draw();
+	//crs.draw();
+	poly.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 	
 	
