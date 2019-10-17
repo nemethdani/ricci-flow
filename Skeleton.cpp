@@ -264,7 +264,12 @@ class Polygon: public Primitive{
 			std::vector<bool> isClipped(vertices.size(),false);
 			
 			size_t i=0;
+			size_t numofclips_at0;
+			size_t numofclips_atLast;
+			
 			while(numberofclips<vertices.size()-3){
+				
+				if(i==0){numofclips_at0=numberofclips;}
 				if(isClipped[i]==false){
 					size_t left=index(i-1);
 					while(isClipped[left]==true){left=index(left-1);}
@@ -276,6 +281,13 @@ class Polygon: public Primitive{
 						triangles.push_back(vertices[right]);
 						isClipped[i]=true;
 						++numberofclips;
+					}
+				}
+				if(i==vertices.size()-1){
+					numofclips_atLast=numberofclips;
+					if(numofclips_at0 == numofclips_atLast){
+					std::cerr<<"Nem egyszerű polinom , tesszalláció megáll"<<std::endl;
+					return triangles;
 					}
 				}
 				i=index(i+1);
@@ -460,14 +472,14 @@ vec2 Lagrange_acceleration(float t1, float t2, float t3, vec2 r1, vec2 r2, vec2 
 
 }
 
-std::vector<vec2> points{vec2( -0.8f, -0.8f), vec2(-0.6f, 1.0f), vec2(0.8f, -0.2f), vec2(0.0f, 0.1f)};
+std::vector<vec2> points{vec2( -0.5, -0.58), vec2(0.16, 0.31), vec2(0.583333, -0.806667), vec2(0.78, -0.15)};
 std::vector<vec2> speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
 std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(50, 125),
                  vec2(125, 90),
                  vec2(150, 10)};
-//Polygon poly(points);
-Polygon poly{};
+Polygon poly(points);
+Polygon poly_interactive{};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,points};
@@ -543,10 +555,10 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	case GLUT_LEFT_BUTTON:{
 		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
 		if(buttonStat=="pressed"){
-			poly.add(vec2(cX, cY));
+			poly_interactive.add(vec2(cX, cY));
 			std::cout<<"vertex added to: "<<cX<<","<<cY<<std::endl;
 			glClear(GL_COLOR_BUFFER_BIT);
-			poly.draw();
+			poly_interactive.draw();
 		}
 		
 		glutSwapBuffers();
