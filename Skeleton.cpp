@@ -220,6 +220,21 @@ class Primitive{
 
 			}
 };
+class Points: public Primitive{
+	std::vector<vec2> points;
+	void genvertices(std::vector<float>& vertices)const{
+		for(auto p:points){
+			vertices.push_back(p.x);
+			vertices.push_back(p.y);
+		}
+	}
+
+	public:
+		Points(std::vector<vec2> points):Primitive(GL_POINTS),points(points){}
+		void add(vec2& point){points.push_back(point);}
+		
+
+};
 
 class Polygon: public Primitive{
 	private:
@@ -504,6 +519,7 @@ std::vector<vec2> points2{
 
 Polygon poly(points2);
 Polygon poly_interactive{};
+Points refpoints;
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,points};
@@ -537,7 +553,7 @@ void onDisplay() {
 
 	//tri2.draw();
 	//crs.draw();
-	poly.draw();
+	//poly.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
@@ -575,24 +591,24 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	case GLUT_UP:   buttonStat = "released"; break;
 	}
 
-	// switch (button) {
-	// case GLUT_LEFT_BUTTON:{
-	// 	printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
-	// 	if(buttonStat=="pressed"){
-	// 		poly_interactive.add(vec2(cX, cY));
-	// 		std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
-	// 		glClear(GL_COLOR_BUFFER_BIT);
-	// 		poly_interactive.draw();
-	// 	}
+	switch (button) {
+	case GLUT_LEFT_BUTTON:{
+		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
+		if(buttonStat=="pressed"){
+			poly_interactive.add(vec2(cX, cY));
+			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
+			glClear(GL_COLOR_BUFFER_BIT);
+			poly_interactive.draw();
+		}
 		
-	// 	glutSwapBuffers();
+		glutSwapBuffers();
 
-	// 	break;
+		break;
 
-	// } 
-	// case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
-	// case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
-	// }
+	} 
+	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
+	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
+	}
 }
 
 // Idle event indicating that some time elapsed: do animation here
