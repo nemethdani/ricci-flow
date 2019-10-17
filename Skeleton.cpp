@@ -274,7 +274,7 @@ class Polygon: public Primitive{
 					size_t left=index(i-1);
 					while(isClipped[left]==true){left=index(left-1);}
 					size_t right=index(i+1);
-					while(isClipped[right]==true){right=index(left+1);}
+					while(isClipped[right]==true){right=index(right+1);}
 					if(isDiagonal(vertices[left], vertices[right])){
 						triangles.push_back(vertices[left]);
 						triangles.push_back(vertices[i]);
@@ -478,7 +478,31 @@ std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(50, 125),
                  vec2(125, 90),
                  vec2(150, 10)};
-Polygon poly(points);
+std::vector<vec2> points2{			 
+	vec2(-0.54,-0.53),
+
+	vec2(0.506667,0.0766667),
+
+	vec2(-0.37,0.496667),
+
+	vec2(0.18,-0.593333),
+
+	vec2(-0.523333,-0.833333),
+
+	vec2(-0.673333,-0.0366666),
+
+	vec2(-0.133333,0.393333),
+
+	vec2(0.34,0.533333),
+
+	vec2(0.76,0.303333),
+
+	vec2(0.68,-0.52),
+
+	vec2(0.363333,-0.843333)
+};
+
+Polygon poly(points2);
 Polygon poly_interactive{};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
@@ -513,7 +537,7 @@ void onDisplay() {
 
 	//tri2.draw();
 	//crs.draw();
-	//poly.draw();
+	poly.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
@@ -551,24 +575,24 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	case GLUT_UP:   buttonStat = "released"; break;
 	}
 
-	switch (button) {
-	case GLUT_LEFT_BUTTON:{
-		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
-		if(buttonStat=="pressed"){
-			poly_interactive.add(vec2(cX, cY));
-			std::cout<<"vertex added to: "<<cX<<","<<cY<<std::endl;
-			glClear(GL_COLOR_BUFFER_BIT);
-			poly_interactive.draw();
-		}
+	// switch (button) {
+	// case GLUT_LEFT_BUTTON:{
+	// 	printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
+	// 	if(buttonStat=="pressed"){
+	// 		poly_interactive.add(vec2(cX, cY));
+	// 		std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
+	// 		glClear(GL_COLOR_BUFFER_BIT);
+	// 		poly_interactive.draw();
+	// 	}
 		
-		glutSwapBuffers();
+	// 	glutSwapBuffers();
 
-		break;
+	// 	break;
 
-	} 
-	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
-	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
-	}
+	// } 
+	// case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
+	// case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
+	// }
 }
 
 // Idle event indicating that some time elapsed: do animation here
