@@ -165,6 +165,8 @@ const char * const fragmentSource = R"(
 	}
 )";
 
+GPUProgram gpuProgram; // vertex and fragment shaders
+
 bool segmentIntersect(vec2 segment1_point1, vec2 segment1_point2, vec2 segment2_point1,vec2 segment2_point2){
 	if(segment1_point1==segment2_point1
 		|| segment1_point1==segment2_point2
@@ -193,11 +195,17 @@ class Primitive{
 		unsigned int vao;	   // virtual world on the GPU
 		unsigned int vbo;		// vertex buffer object
 		unsigned int dimension=2;
+		vec3 color;
 		
 		GLenum mode;
 	public:
-		Primitive(GLenum m):mode{m}{};
+		Primitive(GLenum m, vec3 color=vec3(0.0f, 1.0f, 0.0f) /*green*/):mode{m},color(color){};
+		void setColor(vec3 color_){color=color_;}
 		void draw(){
+			// Set color to (0, 1, 0) = green
+			int location = glGetUniformLocation(gpuProgram.getId(), "color");
+			glUniform3f(location, color.x, color.y, color.z); // 3 floats
+
 			glGenVertexArrays(1, &vao);	// get 1 vao id
 			glBindVertexArray(vao);		// make it active
 			glGenBuffers(1, &vbo);	// Generate 1 buffer
@@ -230,8 +238,9 @@ class Points: public Primitive{
 	}
 
 	public:
-		Points(std::vector<vec2> points):Primitive(GL_POINTS),points(points){}
-		void add(vec2& point){points.push_back(point);}
+		Points():Primitive(GL_POINTS){}
+		Points(const vec3& color=vec3(0.0f, 1.0f, 0.0f), std::vector<vec2> points=std::vector<vec2>()):Primitive(GL_POINTS, color),points(points){}
+		void add(const vec2& point){points.push_back(point);}
 		
 
 };
@@ -519,11 +528,13 @@ std::vector<vec2> points2{
 
 Polygon poly(points2);
 Polygon poly_interactive{};
-Points refpoints;
+
+Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
+
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,points};
-GPUProgram gpuProgram; // vertex and fragment shaders
+
 
 
 // Initialization, create an OpenGL context
@@ -539,16 +550,14 @@ void onDisplay() {
 	glClearColor(0, 0, 0, 0);     // background color
 	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
 
-	// Set color to (0, 1, 0) = green
-	int location = glGetUniformLocation(gpuProgram.getId(), "color");
-	glUniform3f(location, 0.0f, 1.0f, 0.0f); // 3 floats
+	
 
 	float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
 							  0, 1, 0, 0,    // row-major!
 							  0, 0, 1, 0,
 							  0, 0, 0, 1 };
 
-	location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
+	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 	//tri2.draw();
@@ -596,9 +605,12 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
 		if(buttonStat=="pressed"){
 			poly_interactive.add(vec2(cX, cY));
+			refpoints.add(vec2(cX, cY));
+			
 			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
 			glClear(GL_COLOR_BUFFER_BIT);
 			poly_interactive.draw();
+			refpoints.draw();
 		}
 		
 		glutSwapBuffers();
