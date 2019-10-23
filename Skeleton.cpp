@@ -357,9 +357,12 @@ class Polygon: public Primitive{
 		bool doesContain(const vec2& point)const{
 			bool contain=false;
 			bool intersect;
-			if(rayCastIntersect(point, vertices.back(),vertices.front())) contain=(!contain);
+			if(rayCastIntersect(point, vertices.back(),vertices.front()))
+				contain=(!contain);
 			for(size_t i=0;i<vertices.size()-1;++i){
-				intersect=rayCastIntersect(point, vertices[i],vertices[i+1]);
+				
+
+				intersect=rayCastIntersect(point, vertices[i],vertices[i+1]); //csak a maradék verticesből kell!
 				if(intersect){
 					contain=(!contain);
 				}
@@ -503,33 +506,23 @@ std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(125, 90),
                  vec2(150, 10)};
 std::vector<vec2> points2{			 
-	vec2(-0.54,-0.53),
+	vec2(-0.493333,-0.33),
 
-	vec2(0.506667,0.0766667),
+	vec2(-0.16,0.213333),
 
-	vec2(-0.37,0.496667),
+	vec2(-0.04,-0.316667),
 
-	vec2(0.18,-0.593333),
+	vec2(0.296667,0.08),
 
-	vec2(-0.523333,-0.833333),
+	vec2(0.23,-0.653333),
 
-	vec2(-0.673333,-0.0366666),
-
-	vec2(-0.133333,0.393333),
-
-	vec2(0.34,0.533333),
-
-	vec2(0.76,0.303333),
-
-	vec2(0.68,-0.52),
-
-	vec2(0.363333,-0.843333)
+	
 };
 
 Polygon poly(points2);
 Polygon poly_interactive{};
 
-Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
+Points refpoints{vec3(1.0f, 0.0f, 1.0f), points2};
 
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
@@ -562,7 +555,8 @@ void onDisplay() {
 
 	//tri2.draw();
 	//crs.draw();
-	//poly.draw();
+	poly.draw();
+	refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
