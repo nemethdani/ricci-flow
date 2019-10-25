@@ -177,10 +177,12 @@ bool segmentIntersect(vec2 segment1_point1, vec2 segment1_point2, vec2 segment2_
 	Float A=segment1_point1.x - segment1_point2.x;
 	Float B=segment2_point2.x- segment2_point1.x;
 	Float C=segment1_point1.y-segment1_point2.y;
-	Float D= segment2_point2.y-segment1_point2.y;
-	Float E=segment1_point2.x - segment2_point2.x;
-	Float F= segment1_point2.y- segment2_point2.y;
-	Float t2=(F-C*E/A)/(D-C*B/A);
+	Float D= segment2_point2.y-segment2_point1.y;
+	Float E=segment2_point2.x - segment1_point2.x;
+	Float F= segment2_point2.y - segment1_point2.y;
+	Float f_ce_pa=F-C*E/A;
+	Float d_cb_pa=D-C*B/A;
+	Float t2=f_ce_pa/d_cb_pa;
 	if(t2>1 || t2<0) return false;
 	Float t1=E/A-B/A*((F-C*E/A)/(D-C*B/A));
 	return (t1>0 && t1<1);
@@ -258,21 +260,28 @@ class Polygon: public Primitive{
 				return ret%numcontrolpoints;
 			}
 		}
-		bool isDiagonal(const vec2& point1, const vec2& point2)const{
-			if(segmentIntersect(point1, point2, vertices.back(), vertices.front())) return false;
+		bool isDiagonal(const vec2& point1, const vec2& point2, const std::vector<vec2>& polivertices)const{
+			if(segmentIntersect(point1, point2, polivertices.back(), polivertices.front())){
+				return false;
+			} 
 			
-			for(size_t i=0;i<vertices.size()-1;++i){
-				if(segmentIntersect(point1, point2, vertices[i], vertices[i+1])) return false;
-				
+			for(size_t i=0;i<polivertices.size()-1;++i){
+				if(segmentIntersect(point1, point2, polivertices[i], polivertices[i+1])){
+					return false;
+				}
 			}
-			if(!doesContain((point1+point2)/2)) return false;
+			if(!doesContain((point1+point2)/2, polivertices)){
+					return false;
+			}
+			
 			return true;
 
 		}
 		void genvertices(std::vector<float>& temp)const override{
 			if(vertices.size()>=3){
+				std::vector<vec2> polyvertices=vertices;
 				std::vector<vec2> triangles;
-				triangles=earclipping(triangles);
+				earclipping(triangles, polyvertices);
 				for(auto v: triangles){
 					temp.push_back(v.x);
 					temp.push_back(v.y);
@@ -283,49 +292,42 @@ class Polygon: public Primitive{
 
 		
 
-		std::vector<vec2>& earclipping(std::vector<vec2>& triangles)const{
-			size_t numberofclips=0;
-			std::vector<bool> isClipped(vertices.size(),false);
-			
-			size_t i=0;
-			size_t numofclips_at0;
-			size_t numofclips_atLast;
-			
-			while(numberofclips<vertices.size()-3){
+		void earclipping(std::vector<vec2>& triangles, std::vector<vec2>& polivertices)const{
+
+			if(polivertices.size()<=3){
 				
-				if(i==0){numofclips_at0=numberofclips;}
-				if(isClipped[i]==false){
-					size_t left=index(i-1);
-					while(isClipped[left]==true){left=index(left-1);}
-					size_t right=index(i+1);
-					while(isClipped[right]==true){right=index(right+1);}
-					if(isDiagonal(vertices[left], vertices[right])){
-						triangles.push_back(vertices[left]);
-						triangles.push_back(vertices[i]);
-						triangles.push_back(vertices[right]);
-						isClipped[i]=true;
-						++numberofclips;
-					}
+				for(auto v: polivertices){
+					triangles.push_back(v);
 				}
-				if(i==vertices.size()-1){
-					numofclips_atLast=numberofclips;
-					if(numofclips_at0 == numofclips_atLast){
-					std::cerr<<"Nem egyszerű polinom , tesszalláció megáll"<<std::endl;
-					return triangles;
-					}
-				}
-				i=index(i+1);
+				
+				return;
 			}
-			while(numberofclips-vertices.size()>0){
-				if(isClipped[i]==false){
-					triangles.push_back(vertices[i]);
-					++numberofclips;
-					isClipped[i]==true;
+			bool simplePolynom=false;
+			
+			for(size_t i=0; !simplePolynom && i<polivertices.size();++i){
+				size_t left=index(i-1);
+				size_t right=index(i+1);
+				if(isDiagonal(polivertices[left], polivertices[right], polivertices)){
+					triangles.push_back(polivertices[left]);
+					triangles.push_back(polivertices[i]);
+					triangles.push_back(polivertices[right]);
+					polivertices.erase(polivertices.begin()+i);
+					simplePolynom=true;
 					
 				}
-				i=index(i+1);
 			}
-			return triangles;
+			if(!simplePolynom){
+					std::cerr<<"Nem egyszerű polinom, tesszaláció megáll"<<std::endl;
+					return;
+			}
+				
+
+			earclipping(triangles, polivertices); //ezt föl a ciklusba?
+			return;
+
+
+			
+			
 			
 		}
 
@@ -354,15 +356,15 @@ class Polygon: public Primitive{
 		std::vector<vec2> vertices;
 	public:
 		Polygon(const std::vector<vec2>& v=std::vector<vec2>()):Primitive{GL_TRIANGLES}, vertices{v}{};
-		bool doesContain(const vec2& point)const{
+		bool doesContain(const vec2& point, const std::vector<vec2>& polivertices)const{
 			bool contain=false;
 			bool intersect;
-			if(rayCastIntersect(point, vertices.back(),vertices.front()))
+			if(rayCastIntersect(point, polivertices.back(),polivertices.front()))
 				contain=(!contain);
-			for(size_t i=0;i<vertices.size()-1;++i){
+			for(size_t i=0;i<polivertices.size()-1;++i){
 				
 
-				intersect=rayCastIntersect(point, vertices[i],vertices[i+1]); //csak a maradék verticesből kell!
+				intersect=rayCastIntersect(point, polivertices[i],polivertices[i+1]); //csak a maradék verticesből kell!
 				if(intersect){
 					contain=(!contain);
 				}
@@ -506,15 +508,15 @@ std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(125, 90),
                  vec2(150, 10)};
 std::vector<vec2> points2{			 
-	vec2(-0.493333,-0.33),
+	vec2(-0.523333,-0.456667),
 
-	vec2(-0.16,0.213333),
+	vec2(0.0666667,0.17),
 
-	vec2(-0.04,-0.316667),
+	vec2(0.253333,-0.166667),
 
-	vec2(0.296667,0.08),
+	vec2(0.49,0.11),
 
-	vec2(0.23,-0.653333),
+	vec2(0.72,-0.27),
 
 	
 };
@@ -555,8 +557,8 @@ void onDisplay() {
 
 	//tri2.draw();
 	//crs.draw();
-	poly.draw();
-	refpoints.draw();
+	 poly.draw();
+	 refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
