@@ -502,10 +502,17 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 		}
 	
 	public:
-		Catmull_Rom_spline(size_t ngon_,std::vector<vec2>& ctrpts_):Hermite_interpolation_curve(ngon_,ctrpts_){
+		Catmull_Rom_spline(size_t ngon_,const std::vector<vec2>& ctrpts_=std::vector<vec2>()):Hermite_interpolation_curve(ngon_,ctrpts_){
 			
 			
 			generateSpeeds();
+			genvertices_helper(vertices);
+		}
+		void addCtrPoint(vec2 ctrPoint){
+			controlpoints.push_back(ctrPoint);
+			speeds.clear();
+			generateSpeeds();
+			vertices.clear();
 			genvertices_helper(vertices);
 		}
 };
@@ -565,7 +572,8 @@ std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{20,crs_points};
-Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
+Catmull_Rom_spline interactive_crs{100};
+Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
 
 
 
@@ -597,9 +605,9 @@ void onDisplay() {
 	glPointSize(5);
 	
 	//tri2.draw();
-	crs.draw();
+	//crs.draw();
 	 //poly.draw();
-	 refpoints.draw();
+	 //refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
@@ -641,13 +649,13 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	case GLUT_LEFT_BUTTON:{
 		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
 		if(buttonStat=="pressed"){
-			poly_interactive.add(vec2(cX, cY));
+			interactive_crs.addCtrPoint(vec2(cX, cY));
 			refpoints.add(vec2(cX, cY));
 			
 			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
 			glClear(GL_COLOR_BUFFER_BIT);
-			//poly_interactive.draw();
-			//refpoints.draw();
+			interactive_crs.draw();
+			refpoints.draw();
 		}
 		
 		glutSwapBuffers();
