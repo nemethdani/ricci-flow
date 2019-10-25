@@ -376,6 +376,7 @@ class Polygon: public Primitive{
 		virtual void add(const vec2& point){
 			vertices.push_back(point);
 		}
+		std::vector<vec2> getVertices()const{return vertices;}
 };
 
 class Triangle: public Primitive{
@@ -416,10 +417,10 @@ class Hermite_interpolation_curve: public Polygon{
 				vec2 vertex=Hermite_value(
 								controlpoints[index(left_time_index)],
 								speeds[index(left_time_index)],
-								times[index(left_time_index)],
+								left_time_index,
 								controlpoints[index(right_time_index)],
 								speeds[index(right_time_index)],
-								times[index(right_time_index)],
+								right_time_index, 
 								t
 							);
 				temp.push_back(vertex);
@@ -466,27 +467,35 @@ class Hermite_interpolation_curve: public Polygon{
 
 			};
 		
+		
 };
 
 class Catmull_Rom_spline: public Hermite_interpolation_curve{
 	size_t numCtrPts=controlpoints.size();
+
+	private:
+		void generateSpeeds(){
+			numCtrPts=controlpoints.size();
+			for(size_t i=0;i<numCtrPts;i<++i){
+				
+				vec2 a=(controlpoints[index(i+1)]-controlpoints[index(i)]);
+				
+				vec2 b=controlpoints[index(i)];
+				vec2 b_=controlpoints[index(i-1)];
+				b=b-b_;
+				
+				
+				speeds.push_back(0.5*(a+b));
+
+			}
+
+		}
 	
 	public:
 		Catmull_Rom_spline(size_t ngon_,std::vector<vec2>& ctrpts_):Hermite_interpolation_curve(ngon_,ctrpts_){
 			
 			
-			for(size_t i=0;i<numCtrPts;i<++i){
-				
-				vec2 a=(controlpoints[index(i+1)]-controlpoints[index(i)]);
-				a=a/fabs(times[index(i+1)]-times[index(i)]);
-				vec2 b=controlpoints[index(i)];
-				vec2 b_=controlpoints[index(i-1)];
-				b=b-b_;
-				b=b/fabs(times[index(i)]-times[index(i-1)]);
-				
-				speeds.push_back(0.5*(a+b));
-
-			}
+			generateSpeeds();
 			genvertices_helper(vertices);
 		}
 };
@@ -524,11 +533,12 @@ std::vector<vec2> points2{
 Polygon poly(points2);
 Polygon poly_interactive{};
 
-Points refpoints{vec3(1.0f, 0.0f, 1.0f), points2};
 
+std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0.1f)};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
-Catmull_Rom_spline crs{100,points};
+Catmull_Rom_spline crs{100,points2};
+Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
 
 
 
@@ -556,8 +566,8 @@ void onDisplay() {
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 	//tri2.draw();
-	//crs.draw();
-	 poly.draw();
+	crs.draw();
+	 //poly.draw();
 	 refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
