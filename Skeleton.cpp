@@ -45,7 +45,7 @@ namespace smartfloat{
 		Float(float value) : value_(value) {}
 		explicit operator float() const { return value_; }
 	
-		static constexpr float epsilon = 1e-4f;
+		static constexpr float epsilon = 1e-7f;
 	
 	private:
 		float value_;
@@ -249,8 +249,8 @@ class Points: public Primitive{
 
 class Polygon: public Primitive{
 	private:
-		virtual size_t index(int i)const{
-			int numcontrolpoints=vertices.size();
+		virtual size_t index(int i, size_t numcontrolpoints)const{
+			
 			if(i>=0){
 				return i%numcontrolpoints;
 			}
@@ -305,8 +305,8 @@ class Polygon: public Primitive{
 			bool simplePolynom=false;
 			
 			for(size_t i=0; !simplePolynom && i<polivertices.size();++i){
-				size_t left=index(i-1);
-				size_t right=index(i+1);
+				size_t left=index(i-1, polivertices.size());
+				size_t right=index(i+1, polivertices.size());
 				if(isDiagonal(polivertices[left], polivertices[right], polivertices)){
 					triangles.push_back(polivertices[left]);
 					triangles.push_back(polivertices[i]);
@@ -317,12 +317,15 @@ class Polygon: public Primitive{
 				}
 			}
 			if(!simplePolynom){
-					std::cerr<<"Nem egyszerű polinom, tesszaláció megáll"<<std::endl;
-					return;
+				std::cerr<<"Nem egyszerű polinom, tesszaláció megáll"<<std::endl;
+				for(auto v: polivertices){
+					std::cerr<<"vec2("<<v.x<<", "<<v.y<<"),"<<std::endl;
+				}
+				return;
 			}
 				
 
-			earclipping(triangles, polivertices); //ezt föl a ciklusba?
+			earclipping(triangles, polivertices); 
 			return;
 
 
@@ -408,29 +411,36 @@ class Hermite_interpolation_curve: public Polygon{
 		
 		void genvertices_helper(std::vector<vec2>& temp)const{
 			if(controlpoints.size()==0 || speeds.size()==0 || controlpoints.size()!=speeds.size()) return;
-			size_t left_time_index=0;
-			size_t right_time_index=1;
-			float t=times[0];
-			float t_step_size=1.0/(float(ngon)/float(times.size()));
 			
-			while(right_time_index<=times.size()){
-				vec2 vertex=Hermite_value(
-								controlpoints[index(left_time_index)],
-								speeds[index(left_time_index)],
+			float t_step_size=1/(float(ngon)/float(controlpoints.size()));
+			Float t=0;
+			size_t left_time_index=0;
+			
+			
+
+			for(t;t<Float(controlpoints.size());t+=t_step_size){
+					while(!(Float(left_time_index)<=t && t<=Float(left_time_index+1))){
+						++left_time_index;
+					}
+					size_t right_time_index=left_time_index+1;
+					vec2 vertex=Hermite_value(
+								controlpoints[left_time_index],
+								speeds[left_time_index],
 								left_time_index,
 								controlpoints[index(right_time_index)],
 								speeds[index(right_time_index)],
 								right_time_index, 
-								t
+								float(t)
 							);
-				temp.push_back(vertex);
+					temp.push_back(vertex);
+					
+			}
 
-				t+=t_step_size;
-				if(Float(t)>=Float(right_time_index)){
-					left_time_index++;
-					right_time_index++;
-				};
-			};
+
+
+			
+			
+			
 			
 		};
 	private:
@@ -516,7 +526,8 @@ std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(50, 125),
                  vec2(125, 90),
                  vec2(150, 10)};
-std::vector<vec2> points2{			 
+
+std::vector<vec2> crs_points{			 
 	vec2(-0.523333,-0.456667),
 
 	vec2(0.0666667,0.17),
@@ -529,15 +540,31 @@ std::vector<vec2> points2{
 
 	
 };
+std::vector<vec2> debugpoints{			 
+	vec2(0.0666668, 0.17),
+	vec2(0.212604, -0.103047),
+	vec2(0.253333, -0.166667),
+	vec2(0.30914, -0.125235),
+	vec2(0.368958, -0.0256252),
+	vec2(0.43013, 0.0726301),
+	vec2(0.49, 0.11),
+	vec2(0.5825, 0.0566407),
+	vec2(0.6975, -0.0510416),
+	vec2(0.76625, -0.173203),
+	vec2(0.72, -0.27),
+	vec2(0.469792, -0.349323),
+	vec2(0.0758336, -0.42625),
+	vec2(-0.306875, -0.471719)
+};
 
-Polygon poly(points2);
+//Polygon poly(points2);
 Polygon poly_interactive{};
 
 
 std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0.1f)};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
-Catmull_Rom_spline crs{100,points2};
+Catmull_Rom_spline crs{20,crs_points};
 Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
 
 
@@ -565,6 +592,10 @@ void onDisplay() {
 	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
+
+	glEnable(GL_POINT_SMOOTH);
+	glPointSize(5);
+	
 	//tri2.draw();
 	crs.draw();
 	 //poly.draw();
@@ -615,8 +646,8 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 			
 			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
 			glClear(GL_COLOR_BUFFER_BIT);
-			poly_interactive.draw();
-			refpoints.draw();
+			//poly_interactive.draw();
+			//refpoints.draw();
 		}
 		
 		glutSwapBuffers();
