@@ -247,9 +247,7 @@ class Points: public Primitive{
 
 };
 
-class Polygon: public Primitive{
-	private:
-		virtual size_t index(int i, size_t numcontrolpoints)const{
+size_t index(int i, size_t numcontrolpoints){
 			
 			if(i>=0){
 				return i%numcontrolpoints;
@@ -259,6 +257,13 @@ class Polygon: public Primitive{
 				int ret=numcontrolpoints-negmod;
 				return ret%numcontrolpoints;
 			}
+}
+
+class Polygon: public Primitive{
+	private:
+		virtual size_t index(int i, size_t numcontrolpoints)const{
+			
+			return ::index(i, numcontrolpoints);
 		}
 		bool isDiagonal(const vec2& point1, const vec2& point2, const std::vector<vec2>& polivertices)const{
 			if(segmentIntersect(point1, point2, polivertices.back(), polivertices.front())){
@@ -318,9 +323,9 @@ class Polygon: public Primitive{
 			}
 			if(!simplePolynom){
 				std::cerr<<"Nem egyszerű polinom, tesszaláció megáll"<<std::endl;
-				for(auto v: polivertices){
-					std::cerr<<"vec2("<<v.x<<", "<<v.y<<"),"<<std::endl;
-				}
+				// for(auto v: polivertices){
+				// 	std::cerr<<"vec2("<<v.x<<", "<<v.y<<"),"<<std::endl;
+				// }
 				return;
 			}
 				
@@ -380,6 +385,13 @@ class Polygon: public Primitive{
 			vertices.push_back(point);
 		}
 		std::vector<vec2> getVertices()const{return vertices;}
+		size_t getSize()const{return vertices.size();}
+		const vec2& operator[](size_t i)const{
+			return vertices[index(i, vertices.size())];
+		}
+		vec2& operator[](size_t i){
+			return vertices[index(i, vertices.size())];
+		}
 };
 
 class Triangle: public Primitive{
@@ -519,12 +531,74 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 
 
 // http://mathworld.wolfram.com/LagrangeInterpolatingPolynomial.html (5)ös képletből
-vec2 Lagrange_acceleration(float t1, float t2, float t3, vec2 r1, vec2 r2, vec2 r3){
-	vec2 a=r1/(t1-t2)/(t1-t3);
-	vec2 b=r2/(t2-t1)/(t2-t3);
-	vec2 c=r3/(t3-t1)/(t3-t2);
+vec2 Lagrange_acceleration(vec2 r1, vec2 r2, vec2 r3){
+	
+	// Lehet hogy csak egymás melletti páronként egyezik a hosszal?
+	float t1_t2=length(r1-r2);
+	float t2_t3=length(r2-r3);
+	float t3_t1=length(r3-r1);
+
+	//Kelle előjellel jelezni a kivonás irányát (most felteszem, hogy igen)
+	float t1_t3=-t3_t1;
+	float t2_t1=-t1_t2;
+	float t3_t2=-t2_t3;
+	
+	vec2 a=r1/(t1_t2)/(t1_t3);
+	vec2 b=r2/(t2_t1)/(t2_t3);
+	vec2 c=r3/(t3_t1)/(t3_t2);
 	return 2.0*(a+b+c);
 
+}
+
+float constantAreaScalingFactor(const std::vector<vec2>& accelerations, const Polygon& polygon){
+	float X, Y, Z;
+	X= Y= Z=float();
+	const std::vector<vec2> a=accelerations;
+	const Polygon p=polygon;
+	size_t polysize=polygon.getSize();
+	//utolsó előtti ponting
+	for(size_t i;i<polysize-1;++i){
+		X+=a[i].x*a[i+1].y - a[i+1].x*a[i].y;
+		Y+=a[i].x*p[i+1].y + a[i+1].y*p[i].x - a[i+1].x*p[i].y - a[i].y*p[i+1].x;
+		Z+=p[i].x*p[i+1].y - p[i+1].x*p[i].y;
+	}
+	//utolsó és első pont
+	size_t i=polysize-1;
+	X+=a[i].x*a[0].y - a[0].x*a[i].y;
+	Y+=a[i].x*p[0].y + a[0].y*p[i].x - a[0].x*p[i].y - a[i].y*p[0].x;
+	Z+=p[i].x*p[0].y - p[0].x*p[i].y;
+
+	float X_times2=2*X;
+	float scaling=(-Y+sqrtf(Y*Y-X_times2*Z))/X_times2;
+	//kell a negatív megoldás is?
+	return scaling;
+
+}
+
+void constantAreaScaling(Polygon& polygon){
+	std::vector<vec2> accelerations;
+	size_t polysize=polygon.getSize();
+	for(size_t i=0;i<polysize;++i){
+		vec2 a=Lagrange_acceleration(index(i-1, polysize), index(i, polysize), index(i+1, polysize));
+		accelerations.push_back(std::move(a));
+	}
+	if(accelerations.size()!=polysize){
+		std::cerr<<"gyorsulások száma nem egyenlő a polygon pontjainak számával"<<std::endl;
+	}
+	float scaling=constantAreaScalingFactor(accelerations, polygon);
+	for(size_t i=0;i<polysize;++i){
+		polygon[i]=polygon[i] + scaling*accelerations[i];
+	}
+
+
+}
+
+void ricciFlow(Polygon& polygon){
+	constantAreaScaling(polygon);
+	while(true){
+		glClear(GL_COLOR_BUFFER_BIT);
+		polygon.draw();
+	}
 }
 
 std::vector<vec2> points{vec2( -0.5, -0.58), vec2(0.16, 0.31), vec2(0.583333, -0.806667), vec2(0.78, -0.15)};
@@ -603,11 +677,11 @@ void onDisplay() {
 
 	glEnable(GL_POINT_SMOOTH);
 	glPointSize(5);
-	
+
 	//tri2.draw();
 	//crs.draw();
-	 //poly.draw();
-	 //refpoints.draw();
+	//poly.draw();
+	//refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
@@ -619,6 +693,7 @@ void onDisplay() {
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
 	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
+	if (key == 'a') ricciFlow(interactive_crs);
 }
 
 // Key of ASCII code released
