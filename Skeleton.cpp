@@ -429,11 +429,10 @@ class Hermite_interpolation_curve: public Polygon{
 			size_t left_time_index=0;
 			
 			
-
-			for(t;t<Float(controlpoints.size());t+=t_step_size){
-					while(!(Float(left_time_index)<=t && t<=Float(left_time_index+1))){
+			for(t; t<Float(controlpoints.size()) && temp.size()<ngon; t+=t_step_size){
+					while(!(Float(left_time_index)<=t && t<Float(left_time_index+1))){
 						++left_time_index;
-					}
+					};
 					size_t right_time_index=left_time_index+1;
 					vec2 vertex=Hermite_value(
 								controlpoints[left_time_index],
@@ -444,16 +443,9 @@ class Hermite_interpolation_curve: public Polygon{
 								right_time_index, 
 								float(t)
 							);
-					temp.push_back(vertex);
-					
-			}
-
-
-
-			
-			
-			
-			
+					temp.push_back(vertex);	
+							
+			};
 		};
 	private:
 		
@@ -534,14 +526,14 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 vec2 Lagrange_acceleration(vec2 r1, vec2 r2, vec2 r3){
 	
 	// Lehet hogy csak egymás melletti páronként egyezik a hosszal?
-	float t1_t2=length(r1-r2);
-	float t2_t3=length(r2-r3);
-	float t3_t1=length(r3-r1);
+	float t2_t1=length(r2-r1);
+	float t3_t2=length(r2-r3);
+	float t3_t1=t2_t1+t3_t2;
 
 	//Kelle előjellel jelezni a kivonás irányát (most felteszem, hogy igen)
+	float t1_t2=-t2_t1;
 	float t1_t3=-t3_t1;
-	float t2_t1=-t1_t2;
-	float t3_t2=-t2_t3;
+	float t2_t3=-t3_t2;
 	
 	vec2 a=r1/(t1_t2)/(t1_t3);
 	vec2 b=r2/(t2_t1)/(t2_t3);
@@ -560,18 +552,58 @@ float constantAreaScalingFactor(const std::vector<vec2>& accelerations, const Po
 	for(size_t i;i<polysize-1;++i){
 		X+=a[i].x*a[i+1].y - a[i+1].x*a[i].y;
 		Y+=a[i].x*p[i+1].y + a[i+1].y*p[i].x - a[i+1].x*p[i].y - a[i].y*p[i+1].x;
-		Z+=p[i].x*p[i+1].y - p[i+1].x*p[i].y;
+		//Z+=p[i].x*p[i+1].y - p[i+1].x*p[i].y;
 	}
 	//utolsó és első pont
 	size_t i=polysize-1;
 	X+=a[i].x*a[0].y - a[0].x*a[i].y;
 	Y+=a[i].x*p[0].y + a[0].y*p[i].x - a[0].x*p[i].y - a[i].y*p[0].x;
-	Z+=p[i].x*p[0].y - p[0].x*p[i].y;
+	
 
-	float X_times2=2*X;
-	float scaling=(-Y+sqrtf(Y*Y-X_times2*Z))/X_times2;
-	//kell a negatív megoldás is?
+	
+	float scaling=-Y/X;
+	
 	return scaling;
+
+}
+
+float area(const Polygon& p){
+	float sum=0;
+	for(size_t i=0;i<p.getSize();++i){
+		sum+=p[i].x*p[i+1].y - p[i+1].x*p[i].y;
+	}
+	return fabs(0.5*sum);
+}
+
+vec2 centroid(const Polygon& p){
+	vec2 center(0,0);
+	for(size_t i=0;i<p.getSize();++i){
+		center=center+p[i];
+		
+	}
+	return center/p.getSize();
+}
+
+vec2 constantAreaTranslationFactor(Polygon& polygon, std::vector<vec2>& accelerations, float deltaT=float(1.0/60), float s_y=1.0){
+	float X, Y1, Y2;Y2=Y1=X=float();
+	size_t polysize=polygon.getSize();
+	std::vector<vec2>& a=accelerations;
+	Polygon& p=polygon;
+	//utolsó előtti ponting
+	for(size_t i;i<polysize-1;++i){
+		X+=a[i].x*a[i+1].y - a[i+1].x*a[i].y;
+		Y1+=a[i].x*p[i+1].y - a[i+1].x*p[i].y ;
+		Y2+=a[i+1].y*p[i].x - a[i].y*p[i+1].x;
+		
+	}
+	//utolsó és első pont
+	size_t i=polysize-1;
+	X+=a[i].x*a[0].y - a[0].x*a[i].y;
+	Y1+=a[i].x*p[0].y - a[0].x*p[i].y ;
+	Y2+=a[0].y*p[i].x - a[i].y*p[0].x;
+
+	float s_xt=(-s_y*deltaT*Y2)/(s_y*deltaT*X+Y1);
+	return vec2(s_xt, s_y*deltaT);
 
 }
 
@@ -579,25 +611,47 @@ void constantAreaScaling(Polygon& polygon){
 	std::vector<vec2> accelerations;
 	size_t polysize=polygon.getSize();
 	for(size_t i=0;i<polysize;++i){
-		vec2 a=Lagrange_acceleration(index(i-1, polysize), index(i, polysize), index(i+1, polysize));
+		vec2 a=Lagrange_acceleration(polygon[i-1],polygon[i], polygon[i+1]);
 		accelerations.push_back(std::move(a));
 	}
 	if(accelerations.size()!=polysize){
 		std::cerr<<"gyorsulások száma nem egyenlő a polygon pontjainak számával"<<std::endl;
 	}
-	float scaling=constantAreaScalingFactor(accelerations, polygon);
+	
+	//float scaling=constantAreaScalingFactor(accelerations, polygon);
+
+	vec2 centroid1=centroid(polygon);
+	Float area1=area(polygon);
+	float pi=float(M_PI);
+	Float targetAccelLength=sqrtf((pi)/float(area1));
+
+	vec2 trans_sclaing=constantAreaTranslationFactor(polygon, accelerations, float(1.0/60), 0.01);
 	for(size_t i=0;i<polysize;++i){
-		polygon[i]=polygon[i] + scaling*accelerations[i];
+		vec2 targetAccel=normalize(centroid1-polygon[i])*float(targetAccelLength);
+		float translate_x=(accelerations[i].x + targetAccel.x)* trans_sclaing.x;
+		float translate_y=(accelerations[i].y + targetAccel.y) * trans_sclaing.y;
+		
+		polygon[i]=polygon[i] + vec2(translate_x, translate_y);
 	}
 
+	vec2 centroid2=centroid(polygon);
+	Float area2=area(polygon);
+	if(Float(centroid1.x)!=Float(centroid2.x) || Float(centroid1.y)!=Float(centroid2.y))
+		std::cerr<<"centroid mismatch: ("<<centroid1.x<<" "<<centroid1.y<<" "<<centroid2.x<<" "<<centroid2.y<<std::endl;
+	if(area1!=area2)
+		std::cerr<<"area error: "<<area1<<" != "<<area2<<std::endl;
 
 }
 
 void ricciFlow(Polygon& polygon){
-	constantAreaScaling(polygon);
+	
 	while(true){
+		constantAreaScaling(polygon);
+		Points checkpoints{vec3(1,0,1),polygon.getVertices()};
 		glClear(GL_COLOR_BUFFER_BIT);
-		polygon.draw();
+		checkpoints.draw();
+		//polygon.draw();
+		glutSwapBuffers();
 	}
 }
 
@@ -609,15 +663,15 @@ std::vector<vec2> polypoints{vec2(20, 10),
                  vec2(150, 10)};
 
 std::vector<vec2> crs_points{			 
-	vec2(-0.523333,-0.456667),
+	vec2(-0.656667,-0.39),
 
-	vec2(0.0666667,0.17),
+	vec2(-0.37,0.35),
 
-	vec2(0.253333,-0.166667),
+	vec2(0.346667,0.34),
 
-	vec2(0.49,0.11),
+	vec2(0.0633334,-0.323333)
 
-	vec2(0.72,-0.27),
+	
 
 	
 };
@@ -645,9 +699,9 @@ Polygon poly_interactive{};
 std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0.1f)};
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
-Catmull_Rom_spline crs{20,crs_points};
+Catmull_Rom_spline crs{100,crs_points};
 Catmull_Rom_spline interactive_crs{100};
-Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
+Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
 
 
 
@@ -679,9 +733,9 @@ void onDisplay() {
 	glPointSize(5);
 
 	//tri2.draw();
-	//crs.draw();
+	crs.draw();
 	//poly.draw();
-	//refpoints.draw();
+	refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
@@ -693,7 +747,7 @@ void onDisplay() {
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
 	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
-	if (key == 'a') ricciFlow(interactive_crs);
+	else if (key == 'a') ricciFlow(crs);
 }
 
 // Key of ASCII code released
