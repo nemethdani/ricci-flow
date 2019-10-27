@@ -652,7 +652,7 @@ void ricciFlow(Polygon& polygon){
 		Points checkpoints{vec3(1,0,1),polygon.getVertices()};
 		glClear(GL_COLOR_BUFFER_BIT);
 		checkpoints.draw();
-		//polygon.draw();
+		polygon.draw();
 		glutSwapBuffers();
 	}
 }
