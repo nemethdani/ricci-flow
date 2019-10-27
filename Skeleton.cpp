@@ -607,7 +607,7 @@ vec2 constantAreaTranslationFactor(Polygon& polygon, std::vector<vec2>& accelera
 
 }
 
-void constantAreaScaling(Polygon& polygon){
+void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center){
 	std::vector<vec2> accelerations;
 	size_t polysize=polygon.getSize();
 	for(size_t i=0;i<polysize;++i){
@@ -620,33 +620,35 @@ void constantAreaScaling(Polygon& polygon){
 	
 	//float scaling=constantAreaScalingFactor(accelerations, polygon);
 
-	vec2 centroid1=centroid(polygon);
-	Float area1=area(polygon);
+	//vec2 centroid1=centroid(polygon);
+	//Float area1=area(polygon);
 	float pi=float(M_PI);
-	Float targetAccelLength=sqrtf((pi)/float(area1));
+	Float targetAccelLength=sqrtf((pi)/float(targetArea));
 
 	vec2 trans_sclaing=constantAreaTranslationFactor(polygon, accelerations, float(1.0/60), 0.01);
 	for(size_t i=0;i<polysize;++i){
-		vec2 targetAccel=normalize(centroid1-polygon[i])*float(targetAccelLength);
-		float translate_x=(accelerations[i].x + targetAccel.x)* trans_sclaing.x;
-		float translate_y=(accelerations[i].y + targetAccel.y) * trans_sclaing.y;
+		vec2 targetAccel=normalize(center-polygon[i])*float(targetAccelLength);
+		float translate_x=(accelerations[i].x - targetAccel.x)*0.0001 /* * trans_sclaing.x*/   ;
+		float translate_y=(accelerations[i].y - targetAccel.y)*0.0001 /* * trans_sclaing.y*/   ;
 		
 		polygon[i]=polygon[i] + vec2(translate_x, translate_y);
 	}
 
 	vec2 centroid2=centroid(polygon);
 	Float area2=area(polygon);
-	if(Float(centroid1.x)!=Float(centroid2.x) || Float(centroid1.y)!=Float(centroid2.y))
-		std::cerr<<"centroid mismatch: ("<<centroid1.x<<" "<<centroid1.y<<" "<<centroid2.x<<" "<<centroid2.y<<std::endl;
-	if(area1!=area2)
-		std::cerr<<"area error: "<<area1<<" != "<<area2<<std::endl;
+	if(Float(center.x)!=Float(centroid2.x) || Float(center.y)!=Float(centroid2.y))
+		std::cerr<<"centroid mismatch: ("<<center.x<<" "<<center.y<<" "<<centroid2.x<<" "<<centroid2.y<<std::endl;
+	if(targetArea!=area2)
+		std::cerr<<"area error: "<<targetArea<<" != "<<area2<<std::endl;
 
 }
 
 void ricciFlow(Polygon& polygon){
+	float targetArea=area(polygon);
+	vec2 center=centroid(polygon);
 	
 	while(true){
-		constantAreaScaling(polygon);
+		constantAreaScaling(polygon, targetArea, center);
 		Points checkpoints{vec3(1,0,1),polygon.getVertices()};
 		glClear(GL_COLOR_BUFFER_BIT);
 		checkpoints.draw();
