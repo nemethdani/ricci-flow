@@ -625,7 +625,7 @@ float adjustmentScaler(float currentAcceleration, float referenceAcceleration, f
 	return res;
 }
 
-void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center, int timelimit_ms, int dt_ms){
+void constantAreaScaling(Polygon& polygon, float deltaT_sec){
 	std::vector<vec2> accelerations;
 	size_t polysize=polygon.getSize();
 	for(size_t i=0;i<polysize;++i){
@@ -640,60 +640,35 @@ void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center, int ti
 
 	//vec2 centroid1=centroid(polygon);
 	//Float area1=area(polygon);
-	float pi=float(M_PI);
-	Float targetAccelLength=sqrtf((pi)/float(targetArea));
+	// float pi=float(M_PI);
+	// Float targetAccelLength=sqrtf((pi)/float(targetArea));
 
 	//vec2 trans_sclaing=constantAreaTranslationFactor(polygon, accelerations, float(1.0/60), 0.01);
 	for(size_t i=0;i<polysize;++i){
-		vec2 targetAccel=normalize(center-polygon[i])*float(targetAccelLength);
-		float x_scaler=adjustmentScaler(accelerations[i].x, targetAccel.x, 0.0001, timelimit_ms);
-		float y_scaler=adjustmentScaler(accelerations[i].y, targetAccel.y, 0.0001, timelimit_ms);
-		x_scaler=x_scaler*float(dt_ms)*0.001;
-		y_scaler=y_scaler*float(dt_ms)*0.001;
-		std::cout<<"scaler: "<<x_scaler<<" "<<y_scaler<<std::endl;
-		float translate_x=(accelerations[i].x)*dt_ms*10.846e-6 /* 0.0001 jo */  /* * trans_sclaing.x*/   ;
-		float translate_y=(accelerations[i].y)*dt_ms*10.846e-6 /* * trans_sclaing.y*/   ;
+		//vec2 targetAccel=normalize(center-polygon[i])*float(targetAccelLength);
+		//float x_scaler=adjustmentScaler(accelerations[i].x, targetAccel.x, 0.0001, timelimit_ms);
+		//float y_scaler=adjustmentScaler(accelerations[i].y, targetAccel.y, 0.0001, timelimit_ms);
+		// x_scaler=x_scaler*float(dt_ms)*0.001;
+		// y_scaler=y_scaler*float(dt_ms)*0.001;
+		// std::cout<<"scaler: "<<x_scaler<<" "<<y_scaler<<std::endl;
+		float translate_x=(accelerations[i].x)*deltaT_sec*10.846e-3 /* 0.0001 jo */  /* * trans_sclaing.x*/   ;
+		float translate_y=(accelerations[i].y)*deltaT_sec*10.846e-3 /* * trans_sclaing.y*/   ;
 		
 		polygon[i]=polygon[i] + vec2(translate_x, translate_y);
 	}
 
-	vec2 centroid2=centroid(polygon);
-	Float area2=area(polygon);
-	if(Float(center.x)!=Float(centroid2.x) || Float(center.y)!=Float(centroid2.y))
-		std::cerr<<"centroid mismatch: ("<<center.x<<" "<<center.y<<" "<<centroid2.x<<" "<<centroid2.y<<std::endl;
-	if(targetArea!=area2)
-		std::cerr<<"area error: "<<targetArea<<" != "<<area2<<std::endl;
-
+	
 }
 LineLoop ll;
-void ricciFlow(Polygon& polygon, int timelimit_ms=120000){
-	float targetArea=area(polygon);
-	vec2 center=centroid(polygon);
-	int tref_ms=glutGet(GLUT_ELAPSED_TIME);
-	std::cout<<"reftime: "<<tref_ms<<std::endl;
-	int elasped_ms=0;
-	int i=0;
-	int newtime_ms=tref_ms;
-	int oldtime_ms=tref_ms;
+void ricciFlow(Polygon& polygon, float deltaT_sec){
 	
-	while(true){
-		std::cout<<i<<" "<<elasped_ms<< " dt: "<<newtime_ms-oldtime_ms<<" "<< tref_ms<<"\n"<<std::endl;
-		constantAreaScaling(polygon, targetArea, center, timelimit_ms, newtime_ms-oldtime_ms);
-		Points checkpoints{vec3(1,0,1),polygon.getVertices()};
+	
+		
+		constantAreaScaling(polygon, deltaT_sec);
+		//Points checkpoints{vec3(1,0,1),polygon.getVertices()};
 		ll=LineLoop(polygon.getVertices());
-		glClear(GL_COLOR_BUFFER_BIT);
-		//checkpoints.draw();
-		polygon.draw();
-		ll.draw();
-		glutSwapBuffers();
-
-		oldtime_ms=newtime_ms;
-		newtime_ms=glutGet(GLUT_ELAPSED_TIME);
-		elasped_ms=newtime_ms-tref_ms;
-		timelimit_ms-=oldtime_ms-newtime_ms;
-		++i;
-	}
-}
+	
+};
 
 std::vector<vec2> points{vec2( -0.5, -0.58), vec2(0.16, 0.31), vec2(0.583333, -0.806667), vec2(0.78, -0.15)};
 std::vector<vec2> speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
@@ -744,18 +719,15 @@ Catmull_Rom_spline interactive_crs{100, std::vector<vec2>(), };
 //Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
 Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
 
+//float cameraMatrix[4][4];
+
 void cameraRight(){
 	//everything left by 0.2
-	float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
-							  0, 1, 0, 0,    // row-major!
-							  0, 0, 1, 0,
-							  -0.2, 0, 0, 1 };
-	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
-	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
-	glClear(GL_COLOR_BUFFER_BIT);
-	crs.draw();
-	refpoints.draw();
-	glutSwapBuffers();
+	// cameraMatrix = { 1, 0, 0, 0,    // MVP matrix, 
+	// 						  0, 1, 0, 0,    // row-major!
+	// 						  0, 0, 1, 0,
+	// 						  -0.2, 0, 0, 1 };
+	
 }
 
 
@@ -768,6 +740,8 @@ void onInitialization() {
 }
 
 bool animation=false;
+float polygonReferenceArea;
+vec2 polygonReferenceCentroid;
 // Window has become invalid: Redraw
 void onDisplay() {
 	std::cout<<"onDisplay"<<std::endl;
@@ -849,6 +823,8 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 			// interactive_crs.draw();
 			// ll.draw();
 			// refpoints.draw();
+			polygonReferenceArea=area(interactive_crs);
+			polygonReferenceCentroid=centroid(interactive_crs);
 			glutPostRedisplay();
 		}
 		
@@ -866,5 +842,14 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
-	long time = glutGet(GLUT_ELAPSED_TIME); // elapsed time since the start of the program
+   static float tend = 0;
+   const float dt = 0.01; // dt is ”infinitesimal”
+   float tstart = tend;
+   tend = glutGet(GLUT_ELAPSED_TIME)/1000.0f;
+
+   if (animation) for(float t = tstart; t < tend; t += dt) {
+      float Dt = fmin(dt, tend - t);
+      ricciFlow(interactive_crs, Dt);
+   }
+   glutPostRedisplay();
 }
