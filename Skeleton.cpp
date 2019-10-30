@@ -201,7 +201,7 @@ class Primitive{
 		
 		GLenum mode;
 	public:
-		Primitive(GLenum m, vec3 color=vec3(0.0f, 1.0f, 0.0f) /*green*/):mode{m},color(color){};
+		Primitive(GLenum m, vec3 color=vec3(0.0f, 1.0f, 1.0f) /*green*/):mode{m},color(color){};
 		void setColor(vec3 color_){color=color_;}
 		void draw(){
 			// Set color to (0, 1, 0) = green
@@ -229,6 +229,18 @@ class Primitive{
 			//std::cout<<glGetError()<<std::endl;
 
 			}
+};
+class LineLoop: public Primitive{
+	std::vector<vec2> vertices;
+	public:
+		LineLoop():Primitive(GL_LINE_LOOP){};
+		LineLoop(std::vector<vec2> vertices, vec3 color=vec3(1,1,1)):Primitive(GL_LINE_LOOP, color), vertices(vertices){};
+		void genvertices(std::vector<float>& targetvertices)const{
+		for(auto v:vertices){
+			targetvertices.push_back(v.x);
+			targetvertices.push_back(v.y);
+		}
+	}
 };
 class Points: public Primitive{
 	std::vector<vec2> points;
@@ -474,7 +486,7 @@ class Hermite_interpolation_curve: public Polygon{
 	
 
 	public:
-		Hermite_interpolation_curve(size_t ngon, const std::vector<vec2>& cps, const std::vector<vec2>& sps=std::vector<vec2>() ):
+		Hermite_interpolation_curve(size_t ngon, const std::vector<vec2>& cps, const std::vector<vec2>& sps ):
 			ngon(ngon), controlpoints{cps}, speeds{sps} {
 				for(float t=0;t<controlpoints.size();++t) times.push_back(t);
 				genvertices_helper(vertices);
@@ -506,7 +518,8 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 		}
 	
 	public:
-		Catmull_Rom_spline(size_t ngon_,const std::vector<vec2>& ctrpts_=std::vector<vec2>()):Hermite_interpolation_curve(ngon_,ctrpts_){
+		Catmull_Rom_spline(size_t ngon_,const std::vector<vec2>& ctrpts_=std::vector<vec2>(), vec3 color=vec3(0,1,1))
+			:Hermite_interpolation_curve(ngon_, ctrpts_, std::vector<vec2>()){
 			
 			
 			generateSpeeds();
@@ -524,20 +537,16 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 
 // http://mathworld.wolfram.com/LagrangeInterpolatingPolynomial.html (5)ös képletből
 vec2 Lagrange_acceleration(vec2 r1, vec2 r2, vec2 r3){
-	
-	// Lehet hogy csak egymás melletti páronként egyezik a hosszal?
-	float t2_t1=length(r2-r1);
-	float t3_t2=length(r2-r3);
-	float t3_t1=t2_t1+t3_t2;
 
-	//Kelle előjellel jelezni a kivonás irányát (most felteszem, hogy igen)
-	float t1_t2=-t2_t1;
-	float t1_t3=-t3_t1;
-	float t2_t3=-t3_t2;
+	float t1=-length(r1-r2);
+	float t2=0;
+	float t3=length(r1-r3);
 	
-	vec2 a=r1/(t1_t2)/(t1_t3);
-	vec2 b=r2/(t2_t1)/(t2_t3);
-	vec2 c=r3/(t3_t1)/(t3_t2);
+	
+	
+	vec2 a=r1/(t1-t2)/(t1-t3);
+	vec2 b=r2/(t2-t1)/(t2-t3);
+	vec2 c=r3/(t3-t1)/(t3-t2);
 	return 2.0*(a+b+c);
 
 }
@@ -607,7 +616,16 @@ vec2 constantAreaTranslationFactor(Polygon& polygon, std::vector<vec2>& accelera
 
 }
 
-void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center){
+float adjustmentScaler(float currentAcceleration, float referenceAcceleration, float tolerance, int remaining_time_ms){
+	float adiff=currentAcceleration-referenceAcceleration;
+	float divided=fabs(tolerance/adiff);
+	float logarithm=fabs(logf(divided));
+	float remtime=float(remaining_time_ms)/1000.0;
+	float res=logarithm/remtime;
+	return res;
+}
+
+void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center, int timelimit_ms, int dt_ms){
 	std::vector<vec2> accelerations;
 	size_t polysize=polygon.getSize();
 	for(size_t i=0;i<polysize;++i){
@@ -625,11 +643,16 @@ void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center){
 	float pi=float(M_PI);
 	Float targetAccelLength=sqrtf((pi)/float(targetArea));
 
-	vec2 trans_sclaing=constantAreaTranslationFactor(polygon, accelerations, float(1.0/60), 0.01);
+	//vec2 trans_sclaing=constantAreaTranslationFactor(polygon, accelerations, float(1.0/60), 0.01);
 	for(size_t i=0;i<polysize;++i){
 		vec2 targetAccel=normalize(center-polygon[i])*float(targetAccelLength);
-		float translate_x=(accelerations[i].x - targetAccel.x)*0.0001 /* * trans_sclaing.x*/   ;
-		float translate_y=(accelerations[i].y - targetAccel.y)*0.0001 /* * trans_sclaing.y*/   ;
+		float x_scaler=adjustmentScaler(accelerations[i].x, targetAccel.x, 0.0001, timelimit_ms);
+		float y_scaler=adjustmentScaler(accelerations[i].y, targetAccel.y, 0.0001, timelimit_ms);
+		x_scaler=x_scaler*float(dt_ms)*0.001;
+		y_scaler=y_scaler*float(dt_ms)*0.001;
+		std::cout<<"scaler: "<<x_scaler<<" "<<y_scaler<<std::endl;
+		float translate_x=(accelerations[i].x)*dt_ms*6.846e-6 /* 0.0001 jo */  /* * trans_sclaing.x*/   ;
+		float translate_y=(accelerations[i].y)*dt_ms*6.846e-6 /* * trans_sclaing.y*/   ;
 		
 		polygon[i]=polygon[i] + vec2(translate_x, translate_y);
 	}
@@ -642,18 +665,33 @@ void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center){
 		std::cerr<<"area error: "<<targetArea<<" != "<<area2<<std::endl;
 
 }
-
-void ricciFlow(Polygon& polygon){
+LineLoop ll;
+void ricciFlow(Polygon& polygon, int timelimit_ms=120000){
 	float targetArea=area(polygon);
 	vec2 center=centroid(polygon);
+	int tref_ms=glutGet(GLUT_ELAPSED_TIME);
+	std::cout<<"reftime: "<<tref_ms<<std::endl;
+	int elasped_ms=0;
+	int i=0;
+	int newtime_ms=tref_ms;
+	int oldtime_ms=tref_ms;
 	
 	while(true){
-		constantAreaScaling(polygon, targetArea, center);
+		std::cout<<i<<" "<<elasped_ms<< " dt: "<<newtime_ms-oldtime_ms<<" "<< tref_ms<<"\n"<<std::endl;
+		constantAreaScaling(polygon, targetArea, center, timelimit_ms, newtime_ms-oldtime_ms);
 		Points checkpoints{vec3(1,0,1),polygon.getVertices()};
+		ll=LineLoop(polygon.getVertices());
 		glClear(GL_COLOR_BUFFER_BIT);
-		checkpoints.draw();
+		//checkpoints.draw();
 		polygon.draw();
+		ll.draw();
 		glutSwapBuffers();
+
+		oldtime_ms=newtime_ms;
+		newtime_ms=glutGet(GLUT_ELAPSED_TIME);
+		elasped_ms=newtime_ms-tref_ms;
+		timelimit_ms-=oldtime_ms-newtime_ms;
+		++i;
 	}
 }
 
@@ -702,9 +740,22 @@ std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,crs_points};
-Catmull_Rom_spline interactive_crs{100};
+Catmull_Rom_spline interactive_crs{100, std::vector<vec2>(), };
 Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
 
+void cameraRight(){
+	//everything left by 0.2
+	float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
+							  0, 1, 0, 0,    // row-major!
+							  0, 0, 1, 0,
+							  -0.2, 0, 0, 1 };
+	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
+	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
+	glClear(GL_COLOR_BUFFER_BIT);
+	crs.draw();
+	refpoints.draw();
+	glutSwapBuffers();
+}
 
 
 // Initialization, create an OpenGL context
@@ -733,6 +784,7 @@ void onDisplay() {
 
 	glEnable(GL_POINT_SMOOTH);
 	glPointSize(5);
+	glLineWidth(4);
 
 	//tri2.draw();
 	crs.draw();
@@ -750,6 +802,7 @@ void onDisplay() {
 void onKeyboard(unsigned char key, int pX, int pY) {
 	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
 	else if (key == 'a') ricciFlow(crs);
+	else if (key == 'p') cameraRight();
 }
 
 // Key of ASCII code released
@@ -784,8 +837,10 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 			refpoints.add(vec2(cX, cY));
 			
 			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
+			ll=LineLoop(interactive_crs.getVertices());
 			glClear(GL_COLOR_BUFFER_BIT);
 			interactive_crs.draw();
+			ll.draw();
 			refpoints.draw();
 		}
 		
