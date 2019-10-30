@@ -651,8 +651,8 @@ void constantAreaScaling(Polygon& polygon, float targetArea, vec2 center, int ti
 		x_scaler=x_scaler*float(dt_ms)*0.001;
 		y_scaler=y_scaler*float(dt_ms)*0.001;
 		std::cout<<"scaler: "<<x_scaler<<" "<<y_scaler<<std::endl;
-		float translate_x=(accelerations[i].x)*dt_ms*6.846e-6 /* 0.0001 jo */  /* * trans_sclaing.x*/   ;
-		float translate_y=(accelerations[i].y)*dt_ms*6.846e-6 /* * trans_sclaing.y*/   ;
+		float translate_x=(accelerations[i].x)*dt_ms*10.846e-6 /* 0.0001 jo */  /* * trans_sclaing.x*/   ;
+		float translate_y=(accelerations[i].y)*dt_ms*10.846e-6 /* * trans_sclaing.y*/   ;
 		
 		polygon[i]=polygon[i] + vec2(translate_x, translate_y);
 	}
@@ -741,7 +741,8 @@ std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,crs_points};
 Catmull_Rom_spline interactive_crs{100, std::vector<vec2>(), };
-Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
+//Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
+Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
 
 void cameraRight(){
 	//everything left by 0.2
@@ -766,8 +767,10 @@ void onInitialization() {
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
 
+bool animation=false;
 // Window has become invalid: Redraw
 void onDisplay() {
+	std::cout<<"onDisplay"<<std::endl;
 	glClearColor(0, 0, 0, 0);     // background color
 	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
 
@@ -787,9 +790,13 @@ void onDisplay() {
 	glLineWidth(4);
 
 	//tri2.draw();
-	crs.draw();
+	//crs.draw();
 	//poly.draw();
-	refpoints.draw();
+	//refpoints.draw();
+
+	interactive_crs.draw();
+	ll.draw();
+	if(!animation) refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
 	
@@ -801,7 +808,7 @@ void onDisplay() {
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
 	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
-	else if (key == 'a') ricciFlow(crs);
+	else if (key == 'a') animation=true;
 	else if (key == 'p') cameraRight();
 }
 
@@ -838,19 +845,22 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 			
 			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
 			ll=LineLoop(interactive_crs.getVertices());
-			glClear(GL_COLOR_BUFFER_BIT);
-			interactive_crs.draw();
-			ll.draw();
-			refpoints.draw();
+			// glClear(GL_COLOR_BUFFER_BIT);
+			// interactive_crs.draw();
+			// ll.draw();
+			// refpoints.draw();
+			glutPostRedisplay();
 		}
 		
-		glutSwapBuffers();
+		//glutSwapBuffers();
 
 		break;
 
 	} 
 	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
 	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
+
+	
 	}
 }
 
