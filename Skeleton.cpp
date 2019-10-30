@@ -742,6 +742,7 @@ void onInitialization() {
 bool animation=false;
 float polygonReferenceArea;
 vec2 polygonReferenceCentroid;
+mat4 MVPtransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 // Window has become invalid: Redraw
 void onDisplay() {
 	std::cout<<"onDisplay"<<std::endl;
@@ -750,13 +751,15 @@ void onDisplay() {
 
 	
 
-	float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
-							  0, 1, 0, 0,    // row-major!
-							  0, 0, 1, 0,
-							  0, 0, 0, 1 };
+	// float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
+	// 						  0, 1, 0, 0,    // row-major!
+	// 						  0, 0, 1, 0,
+	// 						  0, 0, 0, 1 };
+
+	
 
 	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
-	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
+	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf.m[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 
 	glEnable(GL_POINT_SMOOTH);
@@ -783,8 +786,16 @@ void onDisplay() {
 void onKeyboard(unsigned char key, int pX, int pY) {
 	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
 	else if (key == 'a') animation=true;
-	else if (key == 'p') cameraRight();
-}
+	else if (key == 'p') {
+		MVPtransf=MVPtransf*TranslateMatrix(vec3(-0.2,0,0));
+		glutPostRedisplay();
+	}
+	else if(key=='z'){
+		//Nem tiszta, hogy a területnek kell 10%al növekednie, vagy az egységvektoroknak, most az utóbbi vettem
+		MVPtransf=MVPtransf*ScaleMatrix(vec3(1.1, 1.1, 1));
+		glutPostRedisplay();
+	};
+};
 
 // Key of ASCII code released
 void onKeyboardUp(unsigned char key, int pX, int pY) {
