@@ -254,6 +254,7 @@ class Points: public Primitive{
 	public:
 		Points():Primitive(GL_POINTS){}
 		Points(const vec3& color=vec3(0.0f, 1.0f, 0.0f), std::vector<vec2> points=std::vector<vec2>()):Primitive(GL_POINTS, color),points(points){}
+		Points(const vec3& color, vec2 point):Primitive(GL_POINTS, color){points.push_back(point);}
 		void add(const vec2& point){points.push_back(point);}
 		
 		
@@ -606,7 +607,13 @@ void constantAreaScaling(Polygon& polygon, float deltaT_sec){
 }
 LineLoop ll;
 Points polypoints{vec3(1.0f, 0.0f, 1.0f)};
+Points center{vec3(1.0f, 0.0f, 1.0f)};
 Catmull_Rom_spline interactive_crs{100, std::vector<vec2>(), };
+float polygonReferenceArea;
+vec2 polygonReferenceCentroid;
+mat4 MVPtransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
+mat4 Scenetransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
+mat4 Adjustment=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 void ricciFlow(Polygon& polygon, float deltaT_sec){
 	
 	
@@ -615,8 +622,16 @@ void ricciFlow(Polygon& polygon, float deltaT_sec){
 		//Points checkpoints{vec3(1,0,1),polygon.getVertices()};
 		ll=LineLoop(polygon.getVertices());
 		polypoints=Points{vec3(1.0f, 0.0f, 1.0f), interactive_crs.getVertices()};
-
-	
+		float newarea=area(polygon);
+		vec2 newcenter=centroid(polygon);
+		mat4 toOrigo=TranslateMatrix(vec2(0.0f, 0.0f)-newcenter);
+		float s=polygonReferenceArea/newarea;
+		mat4 scale=ScaleMatrix(vec3(sqrtf(s), sqrtf(s), 1));
+		mat4 toRefcenter=TranslateMatrix(polygonReferenceCentroid-vec2(0.0f, 0.0f));
+		Adjustment=toOrigo*scale*toRefcenter*Adjustment;
+		polygonReferenceArea=newarea;
+		polygonReferenceCentroid=newcenter;
+		center=Points{vec3(1.0f, 0.0f, 1.0f),polygonReferenceCentroid};
 };
 
 std::vector<vec2> points{vec2( -0.5, -0.58), vec2(0.16, 0.31), vec2(0.583333, -0.806667), vec2(0.78, -0.15)};
@@ -683,9 +698,7 @@ void onInitialization() {
 }
 
 bool animation=false;
-float polygonReferenceArea;
-vec2 polygonReferenceCentroid;
-mat4 MVPtransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
+
 // Window has become invalid: Redraw
 void onDisplay() {
 	std::cout<<"onDisplay"<<std::endl;
@@ -702,6 +715,7 @@ void onDisplay() {
 	
 
 	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
+	MVPtransf=Scenetransf*Adjustment;
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf.m[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 
@@ -717,6 +731,7 @@ void onDisplay() {
 	interactive_crs.draw();
 	ll.draw();
 	polypoints.draw();
+	center.draw();
 	if(!animation) refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
@@ -731,12 +746,12 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
 	else if (key == 'a') animation=true;
 	else if (key == 'p') {
-		MVPtransf=MVPtransf*TranslateMatrix(vec3(-0.2,0,0));
+		Scenetransf=Scenetransf*TranslateMatrix(vec3(-0.2,0,0));
 		//glutPostRedisplay();
 	}
 	else if(key=='z'){
 		//Nem tiszta, hogy a területnek kell 10%al növekednie, vagy az egységvektoroknak, most az utóbbi vettem
-		MVPtransf=MVPtransf*ScaleMatrix(vec3(1.1, 1.1, 1));
+		Scenetransf=Scenetransf*ScaleMatrix(vec3(1.1, 1.1, 1));
 		//glutPostRedisplay();
 	};
 };
