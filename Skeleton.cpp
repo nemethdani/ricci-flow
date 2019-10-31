@@ -262,12 +262,13 @@ size_t index(int i, size_t numcontrolpoints){
 				return ret%numcontrolpoints;
 			}
 }
+size_t index_(int i, size_t numcontrolpoints){return index(i, numcontrolpoints);}
 
 class Polygon: public Primitive{
 	private:
 		virtual size_t index(int i, size_t numcontrolpoints)const{
 			
-			return ::index(i, numcontrolpoints);
+			return index_(i, numcontrolpoints);
 		}
 		bool isDiagonal(const vec2& point1, const vec2& point2, const std::vector<vec2>& polivertices)const{
 			if(segmentIntersect(point1, point2, polivertices.back(), polivertices.front())){
