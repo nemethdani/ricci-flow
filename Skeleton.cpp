@@ -675,14 +675,15 @@ void onDisplay() {
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf.m[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 
-	glEnable(GL_POINT_SMOOTH);
-	glPointSize(2);
+	//glEnable(GL_POINT_SMOOTH);
+	glPointSize(5);
+	if(animation) glPointSize(2);
 	glLineWidth(5);
 
 	
 	interactive_crs.draw();
 	ll.draw();
-	polypoints.draw();
+	if (animation)polypoints.draw();
 	center.draw();
 	if(!animation) refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
