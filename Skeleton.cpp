@@ -620,6 +620,7 @@ void ricciFlow(Polygon& polygon, float deltaT_sec){
 		float s=polygonReferenceArea/newarea;
 		mat4 scale=ScaleMatrix(vec3(sqrtf(s), sqrtf(s), 1));
 		mat4 toRefcenter=TranslateMatrix(polygonReferenceCentroid-vec2(0.0f, 0.0f));
+		//Adjustment=toOrigo*scale*toRefcenter;
 		Adjustment=toOrigo*scale*toRefcenter*Adjustment;
 		polygonReferenceArea=newarea;
 		polygonReferenceCentroid=newcenter;
@@ -666,7 +667,7 @@ void onDisplay() {
 	
 
 	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
-	MVPtransf=Scenetransf*Adjustment;
+	MVPtransf=Adjustment*Scenetransf;
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf.m[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 
