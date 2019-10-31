@@ -186,9 +186,10 @@ class Primitive{
 		unsigned int vao;	   // virtual world on the GPU
 		unsigned int vbo;		// vertex buffer object
 		unsigned int dimension=2;
+		GLenum mode;
 		vec3 color;
 		
-		GLenum mode;
+		
 	public:
 		Primitive(GLenum m, vec3 color=vec3(0.0f, 1.0f, 1.0f) /*green*/):mode{m},color(color){};
 		void setColor(vec3 color_){color=color_;}
@@ -408,8 +409,9 @@ class Triangle: public Primitive{
 class Hermite_interpolation_curve: public Polygon{
 	protected:
 		size_t ngon;
-		std::vector<vec2> speeds;
 		std::vector<vec2> controlpoints;
+		std::vector<vec2> speeds;
+		
 		std::vector<float> times;
 
 		size_t index(int i)const{
@@ -437,11 +439,11 @@ class Hermite_interpolation_curve: public Polygon{
 			}
 			Float last_knot=knots.back();
 			Float t_step_size=last_knot/float(ngon);
-			Float t=0;
+			;
 			size_t left_time_index=0;
 			
 			
-			for(t; t<last_knot && temp.size()<ngon; t+=t_step_size){
+			for(Float t=0; t<last_knot && temp.size()<ngon; t+=t_step_size){
 					while(!(knots[left_time_index]<=t && t<knots[left_time_index+1])){
 						++left_time_index;
 					};
@@ -502,7 +504,7 @@ class Catmull_Rom_spline: public Hermite_interpolation_curve{
 	private:
 		void generateSpeeds(){
 			numCtrPts=controlpoints.size();
-			for(size_t i=0;i<numCtrPts;i<++i){
+			for(size_t i=0;i<numCtrPts;++i){
 				
 				vec2 a=(controlpoints[index(i+1)]-controlpoints[index(i)]);
 				
@@ -577,7 +579,7 @@ void constantAreaScaling(Polygon& polygon, float deltaT_sec, std::vector<vec2>& 
 	size_t polysize=polygon.getSize();
 	for(size_t i=0;i<polysize;++i){
 		vec2 a=Lagrange_acceleration(polygon[i-1],polygon[i], polygon[i+1]);
-		if(Float(length(a))<Float(length(accelerations[i])) || accelerations[i]==vec2(0.0f, 0.0f))
+		//if(Float(length(a))<Float(length(accelerations[i])) || accelerations[i]==vec2(0.0f, 0.0f))
 			accelerations[i]=a;
 	}
 	// if(accelerations.size()!=polysize){
@@ -605,6 +607,7 @@ mat4 MVPtransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 mat4 Scenetransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 mat4 Adjustment=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 
+
 void ricciFlow(Polygon& polygon, float deltaT_sec){
 	
 	
@@ -625,7 +628,7 @@ void ricciFlow(Polygon& polygon, float deltaT_sec){
 		polygonReferenceArea=newarea;
 		polygonReferenceCentroid=newcenter;
 		center=Points{vec3(1.0f, 0.0f, 1.0f),polygonReferenceCentroid};
-};
+}
 
 
 
@@ -702,7 +705,7 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 		Scenetransf=Scenetransf*ScaleMatrix(vec3(1.1, 1.1, 1));
 		//glutPostRedisplay();
 	};
-};
+}
 
 // Key of ASCII code released
 void onKeyboardUp(unsigned char key, int pX, int pY) {
@@ -721,17 +724,19 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	// Convert to normalized device space
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
+	enum class Action{up, down};
+	Action action;
 
-	char * buttonStat;
+	std::string buttonStat;
 	switch (state) {
-	case GLUT_DOWN: buttonStat = "pressed"; break;
-	case GLUT_UP:   buttonStat = "released"; break;
+	case GLUT_DOWN: buttonStat = "pressed"; action=Action::down; break;
+	case GLUT_UP:   buttonStat = "released"; action=Action::up; break;
 	}
 
 	switch (button) {
 	case GLUT_LEFT_BUTTON:{
-		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);
-		if(buttonStat=="pressed"){
+		printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat.c_str(), cX, cY);
+		if(action==Action::down){
 			interactive_crs.addCtrPoint(vec2(cX, cY));
 			refpoints.add(vec2(cX, cY));
 			
@@ -753,8 +758,8 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 		break;
 
 	} 
-	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
-	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
+	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat.c_str(), cX, cY); break;
+	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat.c_str(), cX, cY);  break;
 
 	
 	}
