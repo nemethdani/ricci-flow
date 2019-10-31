@@ -256,6 +256,7 @@ class Points: public Primitive{
 		Points(const vec3& color=vec3(0.0f, 1.0f, 0.0f), std::vector<vec2> points=std::vector<vec2>()):Primitive(GL_POINTS, color),points(points){}
 		void add(const vec2& point){points.push_back(point);}
 		
+		
 
 };
 
@@ -435,24 +436,33 @@ class Hermite_interpolation_curve: public Polygon{
 		
 		void genvertices_helper(std::vector<vec2>& temp)const{
 			if(controlpoints.size()==0 || speeds.size()==0 || controlpoints.size()!=speeds.size()) return;
-			
-			float t_step_size=1/(float(ngon)/float(controlpoints.size()));
+
+			//eredetileg minden 2 kontrollpont közti görbe egyenlő mennyiségű csúcsot kapott és így görbébnekk tűnt,
+			// de úgy néha túl közel kerültek a csúcsok és szétesett a szimuláció
+			// most hosszal arányos a csúcsszám, cserébe kicsit szögletesnek hat
+			std::vector<float> knots;
+			knots.push_back(0.0f);
+			for(size_t i=1;i<=controlpoints.size();++i){
+				knots.push_back(knots[i-1]+length(controlpoints[index(i)]-controlpoints[i-1]));
+			}
+			Float last_knot=knots.back();
+			Float t_step_size=last_knot/float(ngon);
 			Float t=0;
 			size_t left_time_index=0;
 			
 			
-			for(t; t<Float(controlpoints.size()) && temp.size()<ngon; t+=t_step_size){
-					while(!(Float(left_time_index)<=t && t<Float(left_time_index+1))){
+			for(t; t<last_knot && temp.size()<ngon; t+=t_step_size){
+					while(!(knots[left_time_index]<=t && t<knots[left_time_index+1])){
 						++left_time_index;
 					};
 					size_t right_time_index=left_time_index+1;
 					vec2 vertex=Hermite_value(
 								controlpoints[left_time_index],
 								speeds[left_time_index],
-								left_time_index,
+								knots[left_time_index],
 								controlpoints[index(right_time_index)],
 								speeds[index(right_time_index)],
-								right_time_index, 
+								knots[right_time_index], 
 								float(t)
 							);
 					temp.push_back(vertex);	
@@ -551,30 +561,7 @@ vec2 Lagrange_acceleration(vec2 r1, vec2 r2, vec2 r3){
 
 }
 
-float constantAreaScalingFactor(const std::vector<vec2>& accelerations, const Polygon& polygon){
-	float X, Y, Z;
-	X= Y= Z=float();
-	const std::vector<vec2> a=accelerations;
-	const Polygon p=polygon;
-	size_t polysize=polygon.getSize();
-	//utolsó előtti ponting
-	for(size_t i;i<polysize-1;++i){
-		X+=a[i].x*a[i+1].y - a[i+1].x*a[i].y;
-		Y+=a[i].x*p[i+1].y + a[i+1].y*p[i].x - a[i+1].x*p[i].y - a[i].y*p[i+1].x;
-		//Z+=p[i].x*p[i+1].y - p[i+1].x*p[i].y;
-	}
-	//utolsó és első pont
-	size_t i=polysize-1;
-	X+=a[i].x*a[0].y - a[0].x*a[i].y;
-	Y+=a[i].x*p[0].y + a[0].y*p[i].x - a[0].x*p[i].y - a[i].y*p[0].x;
-	
 
-	
-	float scaling=-Y/X;
-	
-	return scaling;
-
-}
 
 float area(const Polygon& p){
 	float sum=0;
@@ -593,37 +580,7 @@ vec2 centroid(const Polygon& p){
 	return center/p.getSize();
 }
 
-vec2 constantAreaTranslationFactor(Polygon& polygon, std::vector<vec2>& accelerations, float deltaT=float(1.0/60), float s_y=1.0){
-	float X, Y1, Y2;Y2=Y1=X=float();
-	size_t polysize=polygon.getSize();
-	std::vector<vec2>& a=accelerations;
-	Polygon& p=polygon;
-	//utolsó előtti ponting
-	for(size_t i;i<polysize-1;++i){
-		X+=a[i].x*a[i+1].y - a[i+1].x*a[i].y;
-		Y1+=a[i].x*p[i+1].y - a[i+1].x*p[i].y ;
-		Y2+=a[i+1].y*p[i].x - a[i].y*p[i+1].x;
-		
-	}
-	//utolsó és első pont
-	size_t i=polysize-1;
-	X+=a[i].x*a[0].y - a[0].x*a[i].y;
-	Y1+=a[i].x*p[0].y - a[0].x*p[i].y ;
-	Y2+=a[0].y*p[i].x - a[i].y*p[0].x;
 
-	float s_xt=(-s_y*deltaT*Y2)/(s_y*deltaT*X+Y1);
-	return vec2(s_xt, s_y*deltaT);
-
-}
-
-float adjustmentScaler(float currentAcceleration, float referenceAcceleration, float tolerance, int remaining_time_ms){
-	float adiff=currentAcceleration-referenceAcceleration;
-	float divided=fabs(tolerance/adiff);
-	float logarithm=fabs(logf(divided));
-	float remtime=float(remaining_time_ms)/1000.0;
-	float res=logarithm/remtime;
-	return res;
-}
 
 void constantAreaScaling(Polygon& polygon, float deltaT_sec){
 	std::vector<vec2> accelerations;
@@ -636,21 +593,9 @@ void constantAreaScaling(Polygon& polygon, float deltaT_sec){
 		std::cerr<<"gyorsulások száma nem egyenlő a polygon pontjainak számával"<<std::endl;
 	}
 	
-	//float scaling=constantAreaScalingFactor(accelerations, polygon);
-
-	//vec2 centroid1=centroid(polygon);
-	//Float area1=area(polygon);
-	// float pi=float(M_PI);
-	// Float targetAccelLength=sqrtf((pi)/float(targetArea));
-
-	//vec2 trans_sclaing=constantAreaTranslationFactor(polygon, accelerations, float(1.0/60), 0.01);
+	
 	for(size_t i=0;i<polysize;++i){
-		//vec2 targetAccel=normalize(center-polygon[i])*float(targetAccelLength);
-		//float x_scaler=adjustmentScaler(accelerations[i].x, targetAccel.x, 0.0001, timelimit_ms);
-		//float y_scaler=adjustmentScaler(accelerations[i].y, targetAccel.y, 0.0001, timelimit_ms);
-		// x_scaler=x_scaler*float(dt_ms)*0.001;
-		// y_scaler=y_scaler*float(dt_ms)*0.001;
-		// std::cout<<"scaler: "<<x_scaler<<" "<<y_scaler<<std::endl;
+		
 		float translate_x=(accelerations[i].x)*deltaT_sec*10.846e-3 /* 0.0001 jo */  /* * trans_sclaing.x*/   ;
 		float translate_y=(accelerations[i].y)*deltaT_sec*10.846e-3 /* * trans_sclaing.y*/   ;
 		
@@ -660,6 +605,8 @@ void constantAreaScaling(Polygon& polygon, float deltaT_sec){
 	
 }
 LineLoop ll;
+Points polypoints{vec3(1.0f, 0.0f, 1.0f)};
+Catmull_Rom_spline interactive_crs{100, std::vector<vec2>(), };
 void ricciFlow(Polygon& polygon, float deltaT_sec){
 	
 	
@@ -667,15 +614,17 @@ void ricciFlow(Polygon& polygon, float deltaT_sec){
 		constantAreaScaling(polygon, deltaT_sec);
 		//Points checkpoints{vec3(1,0,1),polygon.getVertices()};
 		ll=LineLoop(polygon.getVertices());
+		polypoints=Points{vec3(1.0f, 0.0f, 1.0f), interactive_crs.getVertices()};
+
 	
 };
 
 std::vector<vec2> points{vec2( -0.5, -0.58), vec2(0.16, 0.31), vec2(0.583333, -0.806667), vec2(0.78, -0.15)};
 std::vector<vec2> speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
-std::vector<vec2> polypoints{vec2(20, 10),
-                 vec2(50, 125),
-                 vec2(125, 90),
-                 vec2(150, 10)};
+// std::vector<vec2> polypoints{vec2(20, 10),
+//                  vec2(50, 125),
+//                  vec2(125, 90),
+//                  vec2(150, 10)};
 
 std::vector<vec2> crs_points{			 
 	vec2(-0.656667,-0.39),
@@ -715,20 +664,14 @@ std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0
 //Hermite_interpolation_curve tri{points, speeds};
 Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
 Catmull_Rom_spline crs{100,crs_points};
-Catmull_Rom_spline interactive_crs{100, std::vector<vec2>(), };
+
 //Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
 Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
 
-//float cameraMatrix[4][4];
 
-void cameraRight(){
-	//everything left by 0.2
-	// cameraMatrix = { 1, 0, 0, 0,    // MVP matrix, 
-	// 						  0, 1, 0, 0,    // row-major!
-	// 						  0, 0, 1, 0,
-	// 						  -0.2, 0, 0, 1 };
-	
-}
+
+
+
 
 
 // Initialization, create an OpenGL context
@@ -773,6 +716,7 @@ void onDisplay() {
 
 	interactive_crs.draw();
 	ll.draw();
+	polypoints.draw();
 	if(!animation) refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
@@ -788,12 +732,12 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 	else if (key == 'a') animation=true;
 	else if (key == 'p') {
 		MVPtransf=MVPtransf*TranslateMatrix(vec3(-0.2,0,0));
-		glutPostRedisplay();
+		//glutPostRedisplay();
 	}
 	else if(key=='z'){
 		//Nem tiszta, hogy a területnek kell 10%al növekednie, vagy az egységvektoroknak, most az utóbbi vettem
 		MVPtransf=MVPtransf*ScaleMatrix(vec3(1.1, 1.1, 1));
-		glutPostRedisplay();
+		//glutPostRedisplay();
 	};
 };
 
@@ -830,6 +774,8 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 			
 			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
 			ll=LineLoop(interactive_crs.getVertices());
+			polypoints=Points{vec3(1.0f, 0.0f, 1.0f), interactive_crs.getVertices()};
+			
 			// glClear(GL_COLOR_BUFFER_BIT);
 			// interactive_crs.draw();
 			// ll.draw();
@@ -861,6 +807,8 @@ void onIdle() {
    if (animation) for(float t = tstart; t < tend; t += dt) {
       float Dt = fmin(dt, tend - t);
       ricciFlow(interactive_crs, Dt);
+	  
    }
    glutPostRedisplay();
+   
 }
