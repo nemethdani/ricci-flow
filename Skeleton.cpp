@@ -33,7 +33,7 @@
 //=============================================================================================
 
 #include "framework.h"
-#include <iostream>
+//#include <iostream>
 
 //================
 // Okos Float osztály CPP11 labor megoldásaiból: https://cpp11.eet.bme.hu/lab03/#4
@@ -117,18 +117,7 @@ namespace smartfloat{
 		return !(f1 != f2);
 	}
 	
-	/* kíirás */
-	std::ostream & operator<< (std::ostream & os, Float f) {
-		return os << float(f);
-	}
 	
-	/* beolvasás */
-	std::istream & operator>> (std::istream & is, Float & f) {
-		float raw_f;
-		is >> raw_f;
-		f = raw_f;
-		return is;
-	}
 
 }
 // =====================
@@ -336,7 +325,7 @@ class Polygon: public Primitive{
 				}
 			}
 			if(!simplePolynom){
-				std::cerr<<"Nem egyszerű polinom, tesszaláció megáll"<<std::endl;
+				//std::cerr<<"Nem egyszerű polinom, tesszaláció megáll"<<std::endl;
 				// for(auto v: polivertices){
 				// 	std::cerr<<"vec2("<<v.x<<", "<<v.y<<"),"<<std::endl;
 				// }
@@ -583,22 +572,23 @@ vec2 centroid(const Polygon& p){
 
 
 
-void constantAreaScaling(Polygon& polygon, float deltaT_sec){
-	std::vector<vec2> accelerations;
+void constantAreaScaling(Polygon& polygon, float deltaT_sec, std::vector<vec2>& accelerations){
+	
 	size_t polysize=polygon.getSize();
 	for(size_t i=0;i<polysize;++i){
 		vec2 a=Lagrange_acceleration(polygon[i-1],polygon[i], polygon[i+1]);
-		accelerations.push_back(std::move(a));
+		if(Float(length(a))<Float(length(accelerations[i])) || accelerations[i]==vec2(0.0f, 0.0f))
+			accelerations[i]=a;
 	}
-	if(accelerations.size()!=polysize){
-		std::cerr<<"gyorsulások száma nem egyenlő a polygon pontjainak számával"<<std::endl;
-	}
+	// if(accelerations.size()!=polysize){
+	// 	std::cerr<<"gyorsulások száma nem egyenlő a polygon pontjainak számával"<<std::endl;
+	// }
 	
 	
 	for(size_t i=0;i<polysize;++i){
 		
-		float translate_x=(accelerations[i].x)*deltaT_sec*10.846e-3 /* 0.0001 jo */  /* * trans_sclaing.x*/   ;
-		float translate_y=(accelerations[i].y)*deltaT_sec*10.846e-3 /* * trans_sclaing.y*/   ;
+		float translate_x=(accelerations[i].x)*deltaT_sec*10.846e-3;
+		float translate_y=(accelerations[i].y)*deltaT_sec*10.846e-3;
 		
 		polygon[i]=polygon[i] + vec2(translate_x, translate_y);
 	}
@@ -614,12 +604,14 @@ vec2 polygonReferenceCentroid;
 mat4 MVPtransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 mat4 Scenetransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 mat4 Adjustment=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
+
 void ricciFlow(Polygon& polygon, float deltaT_sec){
 	
 	
+		std::vector<vec2> accelerations(polygon.getSize());
 		
-		constantAreaScaling(polygon, deltaT_sec);
-		//Points checkpoints{vec3(1,0,1),polygon.getVertices()};
+		constantAreaScaling(polygon, deltaT_sec, accelerations);
+		
 		ll=LineLoop(polygon.getVertices());
 		polypoints=Points{vec3(1.0f, 0.0f, 1.0f), interactive_crs.getVertices()};
 		float newarea=area(polygon);
@@ -634,51 +626,17 @@ void ricciFlow(Polygon& polygon, float deltaT_sec){
 		center=Points{vec3(1.0f, 0.0f, 1.0f),polygonReferenceCentroid};
 };
 
-std::vector<vec2> points{vec2( -0.5, -0.58), vec2(0.16, 0.31), vec2(0.583333, -0.806667), vec2(0.78, -0.15)};
-std::vector<vec2> speeds{vec2( -0.8f, -0.8f),vec2( -0.6f, 1.0f), vec2(0.8f, -0.2f)};
-// std::vector<vec2> polypoints{vec2(20, 10),
-//                  vec2(50, 125),
-//                  vec2(125, 90),
-//                  vec2(150, 10)};
 
-std::vector<vec2> crs_points{			 
-	vec2(-0.656667,-0.39),
 
-	vec2(-0.37,0.35),
-
-	vec2(0.346667,0.34),
-
-	vec2(0.0633334,-0.323333)
-
-	
-
-	
-};
-std::vector<vec2> debugpoints{			 
-	vec2(0.0666668, 0.17),
-	vec2(0.212604, -0.103047),
-	vec2(0.253333, -0.166667),
-	vec2(0.30914, -0.125235),
-	vec2(0.368958, -0.0256252),
-	vec2(0.43013, 0.0726301),
-	vec2(0.49, 0.11),
-	vec2(0.5825, 0.0566407),
-	vec2(0.6975, -0.0510416),
-	vec2(0.76625, -0.173203),
-	vec2(0.72, -0.27),
-	vec2(0.469792, -0.349323),
-	vec2(0.0758336, -0.42625),
-	vec2(-0.306875, -0.471719)
-};
 
 //Polygon poly(points2);
-Polygon poly_interactive{};
+//Polygon poly_interactive{};
 
 
-std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0.1f)};
+//std::vector<vec2> triangle={vec2(-0.4f, -0.4f), vec2(-0.3f, 0.5f), vec2(0.4f, -0.1f)};
 //Hermite_interpolation_curve tri{points, speeds};
-Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
-Catmull_Rom_spline crs{100,crs_points};
+//Triangle tri2{std::vector{ -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f }};
+//Catmull_Rom_spline crs{100,crs_points};
 
 //Points refpoints{vec3(1.0f, 0.0f, 1.0f), crs.getVertices()};
 Points refpoints{vec3(1.0f, 0.0f, 1.0f)};
@@ -701,16 +659,9 @@ bool animation=false;
 
 // Window has become invalid: Redraw
 void onDisplay() {
-	std::cout<<"onDisplay"<<std::endl;
+	//std::cout<<"onDisplay"<<std::endl;
 	glClearColor(0, 0, 0, 0);     // background color
 	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
-
-	
-
-	// float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
-	// 						  0, 1, 0, 0,    // row-major!
-	// 						  0, 0, 1, 0,
-	// 						  0, 0, 0, 1 };
 
 	
 
@@ -720,14 +671,10 @@ void onDisplay() {
 
 
 	glEnable(GL_POINT_SMOOTH);
-	glPointSize(5);
-	glLineWidth(4);
+	glPointSize(2);
+	glLineWidth(5);
 
-	//tri2.draw();
-	//crs.draw();
-	//poly.draw();
-	//refpoints.draw();
-
+	
 	interactive_crs.draw();
 	ll.draw();
 	polypoints.draw();
@@ -787,7 +734,7 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 			interactive_crs.addCtrPoint(vec2(cX, cY));
 			refpoints.add(vec2(cX, cY));
 			
-			std::cout<<"vec2("<<cX<<","<<cY<<std::endl;
+			
 			ll=LineLoop(interactive_crs.getVertices());
 			polypoints=Points{vec3(1.0f, 0.0f, 1.0f), interactive_crs.getVertices()};
 			
