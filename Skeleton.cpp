@@ -575,7 +575,7 @@ vec2 centroid(const Polygon& p){
 
 
 
-void constantAreaScaling(Polygon& polygon, float deltaT_sec, std::vector<vec2>& accelerations){
+void flow_translation(Polygon& polygon, float deltaT_sec, std::vector<vec2>& accelerations){
 	
 	size_t polysize=polygon.getSize();
 	for(size_t i=0;i<polysize;++i){
@@ -590,8 +590,8 @@ void constantAreaScaling(Polygon& polygon, float deltaT_sec, std::vector<vec2>& 
 	
 	for(size_t i=0;i<polysize;++i){
 		
-		float translate_x=(accelerations[i].x)*deltaT_sec*10.846e-3;
-		float translate_y=(accelerations[i].y)*deltaT_sec*10.846e-3;
+		float translate_x=(accelerations[i].x)*deltaT_sec*60.846e-3;
+		float translate_y=(accelerations[i].y)*deltaT_sec*60.846e-3;
 		
 		polygon[i]=polygon[i] + vec2(translate_x, translate_y);
 	}
@@ -606,7 +606,16 @@ float polygonReferenceArea;
 vec2 polygonReferenceCentroid;
 mat4 MVPtransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
 mat4 Scenetransf=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
-mat4 Adjustment=ScaleMatrix(vec3(1.0f, 1.0f, 1.0f));
+
+void constantAreaCenter(Polygon& polygon, mat4& adjustment){
+	for(size_t i=0;i<polygon.getSize();++i){
+		vec2& v=polygon[i];
+		vec4 v4(v.x, v.y, 0.0f, 1.0f);
+		vec4 v4_adj=v4*adjustment;
+		v.x=v4_adj.x;
+		v.y=v4_adj.y;
+	}
+}
 
 
 void ricciFlow(Polygon& polygon, float deltaT_sec){
@@ -614,21 +623,31 @@ void ricciFlow(Polygon& polygon, float deltaT_sec){
 	
 		std::vector<vec2> accelerations(polygon.getSize());
 		
-		constantAreaScaling(polygon, deltaT_sec, accelerations);
+		flow_translation(polygon, deltaT_sec, accelerations);
 		
-		ll=LineLoop(polygon.getVertices());
-		polypoints=Points{vec3(1.0f, 0.0f, 1.0f), interactive_crs.getVertices()};
+		
+		
 		float newarea=area(polygon);
 		vec2 newcenter=centroid(polygon);
 		mat4 toOrigo=TranslateMatrix(vec2(0.0f, 0.0f)-newcenter);
+		//constantAreaCenter(polygon, toOrigo);
+		//newcenter=centroid(polygon);
 		float s=polygonReferenceArea/newarea;
 		mat4 scale=ScaleMatrix(vec3(sqrtf(s), sqrtf(s), 1));
+		//constantAreaCenter(polygon, scale);
+		//newcenter=centroid(polygon);
 		mat4 toRefcenter=TranslateMatrix(polygonReferenceCentroid-vec2(0.0f, 0.0f));
 		//Adjustment=toOrigo*scale*toRefcenter;
-		Adjustment=toOrigo*scale*toRefcenter*Adjustment;
-		polygonReferenceArea=newarea;
-		polygonReferenceCentroid=newcenter;
-		center=Points{vec3(1.0f, 0.0f, 1.0f),polygonReferenceCentroid};
+		mat4 adjustment;
+		adjustment=toOrigo*scale*toRefcenter;
+		constantAreaCenter(polygon, adjustment);
+		//newcenter=centroid(polygon);
+		ll=LineLoop(polygon.getVertices());
+		polypoints=Points{vec3(1.0f, 0.0f, 1.0f), interactive_crs.getVertices()};
+		center=Points{vec3(1.0f, 0.0f, 1.0f),centroid(polygon)};
+		//polygonReferenceArea=newarea;
+		//polygonReferenceCentroid=newcenter;
+		
 }
 
 
@@ -671,20 +690,22 @@ void onDisplay() {
 	
 
 	int location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
-	MVPtransf=Adjustment*Scenetransf;
+	MVPtransf=Scenetransf;
 	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf.m[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 
 	//glEnable(GL_POINT_SMOOTH);
 	glPointSize(5);
-	if(animation) glPointSize(2);
+	
 	glLineWidth(5);
 
 	
 	interactive_crs.draw();
 	ll.draw();
-	if (animation)polypoints.draw();
 	center.draw();
+	if(animation) glPointSize(2);
+	if (animation)polypoints.draw();
+	
 	if(!animation) refpoints.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 
@@ -770,7 +791,7 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
    static float tend = 0;
-   const float dt = 0.01; // dt is ”infinitesimal”
+   const float dt = 0.005; // dt is ”infinitesimal”
    float tstart = tend;
    tend = glutGet(GLUT_ELAPSED_TIME)/1000.0f;
 
